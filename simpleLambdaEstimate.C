@@ -5,27 +5,29 @@
 #include "TFile.h"
 #include "TBranch.h"
 #include "TTree.h"
-// #include "TH11"
-// #include "TH2D"
 
-#include "/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/include/ParticleCoor.h"
-// #include "ParticleCoor.h"
+bool debug = true;
+class ParticleCoor;
 
-bool debug = false;
-
+//Was having a problem including a therminator file.
+//This fixes it.
+#define _CXX_VER_ "g++(4.9.1)" 
 void simpleLambdaEstimate(char inTFileName[] = "event000.root")
 {
+  //Load this therminator class
+  gInterpreter->AddIncludePath("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/include");
+  gROOT->LoadMacro("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/src/ParticleCoor.cxx");
+  
+
+
   TFile *thermTFile = new TFile(inTFileName, "READ");
   assert(NULL!=thermTFile);
-
   TTree *thermTree = (TTree*)thermTFile->Get("particles");
   assert(NULL!=thermTree);
-
   TBranch *thermBranch = thermTree->GetBranch("particle");
   ParticleCoor *particleEntry = new ParticleCoor();
   thermBranch->SetAddress(particleEntry);
 
-  //      thermTree->SetBranchAddress("particle", &thermBranch);
 
   //Make a vector to hold a pair count histogram for each event
   std::vector<TH1I*> eventParticles;
@@ -69,6 +71,10 @@ void simpleLambdaEstimate(char inTFileName[] = "event000.root")
 	//Now use this histogram
 	currentHist = hParticles;
       }
+      
+      //Make sure the particle passes the reconstruction cuts
+      if(!CheckIfPassParticleCuts(particleEntry)) continue;
+
       //Check parent info
       for(int iPar = 0; iPar < 10; iPar++)
       {
@@ -76,8 +82,10 @@ void simpleLambdaEstimate(char inTFileName[] = "event000.root")
 	  currentHist->Fill(iPar);
 	  break;
 	}
+	//Check if lambda comes from some other origin
+	if(9 == iPar) cout<<"Found lambda with father:\t"
+			  <<particleEntry->fatherpid<<endl;
       }
-      // if(particleEntry->fatherpid == 3334) cout<<"Found an Omega\n";
     }
   } // end thermEntreis loop
 
@@ -109,9 +117,9 @@ void simpleLambdaEstimate(char inTFileName[] = "event000.root")
 
 double ComputeLambda(const int part1, const int part2, const vector<TH1I*> &eventParticles)
 {
+  
   // Very naive way of calculating <pairs>/<total pairs>
   // Should probably account somehow for events that have particles==0
-
   int nSpecPairs = 0;
   int nTotalPairs = 0;
   int nEvents = eventParticles.size();
@@ -121,20 +129,14 @@ double ComputeLambda(const int part1, const int part2, const vector<TH1I*> &even
     if(part1 == part2) { //particles with indentical pairs
       int nPart1 = eventParticles[iEv]->GetBinContent(part1+1);
       nSpecPairs += nPart1*(nPart1 - 1)/2;
-      // cout<<"Part1\t"<<part1<<"\tPart2\t"<<part2
-      // 	  <<"\tPairs:\t"<<nPart1*(nPart1 - 1)/2<<endl;
     }
     else { //pairs of particles with non-identical parents
       int nPart1 = eventParticles[iEv]->GetBinContent(part1+1);
       int nPart2 = eventParticles[iEv]->GetBinContent(part2+1);
       nSpecPairs += nPart1*nPart2;
-      // cout<<"Part1\t"<<part1<<"\tPart2\t"<<part2
-      // 	  <<"\tPairs:\t"<<nPart1*nPart2<<endl;
     }
     int totalPart = eventParticles[iEv]->GetEntries();
     nTotalPairs += totalPart * (totalPart - 1)/2;
-    // cout<<"Events:\t"<<nEvents<<"\tTotalPairs\t"
-    // 	<<totalPart * (totalPart - 1)/2<<endl;
   } //end looping over events
     
   //Compute average pairs and average total pairs
@@ -151,10 +153,25 @@ TH1D *ComputeAverageYields(const vector<TH1I*> &eventParticles)
   //Find the average yields and std deviation for each particle type
   int nEvents = eventParticles.size();
   TH1D *hAvgYields = eventParticles[0]->Clone("AvgYields");
+  cout<<"test1"<<endl;
+  hAvgYields->Sumw2();
+  cout<<"test2"<<endl;
   for(int iEv = 1; iEv < nEvents; iEv++){
     hAvgYields->Add(eventParticles[iEv]);
   }
   hAvgYields->Scale(1./(1.*nEvents));
   // Compute std deviation...
   return hAvgYields;
+}
+
+
+
+bool CheckIfPassParticleCuts(ParticleCoor *particle)
+{
+  //Implement all sorts of reconstruction/detection cuts here
+  double etaCut = 0.8;
+  if( abs( particle->GetEtaP() ) >= etaCut) return false;
+
+  //If we make it here, the particle passed all the cuts
+  return true;
 }
