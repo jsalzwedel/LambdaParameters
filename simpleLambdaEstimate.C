@@ -35,16 +35,16 @@ void simpleLambdaEstimate(char inTFileName[] = "event000.root")
   int eventCounter = -1;
   TH1I *currentHist = NULL;
 
-  int nParticleTypes = 10;
+  int nParticleTypes = 5;
   int strangePDGs[50] = {3122, //Lambda
 			 3212, //Sigma0
-			 3224, //Sigma*+
-			 3214, //Sigma*0
-			 3114, //Sigma*-
+			 // 3224, //Sigma*+
+			 // 3214, //Sigma*0
+			 // 3114, //Sigma*-
 			 3322, //Xi0
 			 3312, //Xi-
-			 3324, //Xi*0
-			 3314, //Xi*-
+			 // 3324, //Xi*0
+			 // 3314, //Xi*-
 			 3334}; //Omega-
 
   //Loop over all the particles and find the lambdas
@@ -68,10 +68,7 @@ void simpleLambdaEstimate(char inTFileName[] = "event000.root")
 	TString histName = "hParticles";
 	histName += eventCounter;
 	TH1I *hParticles = new TH1I(histName,"Particles Per Type", nParticleTypes, 0, nParticleTypes);
-	
-	cout<<"test1"<<endl;
 	hParticles->Sumw2();
-	cout<<"test2"<<endl;
 
 	eventParticles.push_back(hParticles);
 	//Now use this histogram
@@ -89,8 +86,9 @@ void simpleLambdaEstimate(char inTFileName[] = "event000.root")
 	  break;
 	}
 	//Check if lambda comes from some other origin
-	if(9 == iPar) cout<<"Found lambda with father:\t"
-			  <<particleEntry->fatherpid<<endl;
+	// if(9 == iPar) cout<<"Found lambda with father:\t"
+			  // <<particleEntry->fatherpid<<endl;
+	if(nParticleTypes-1 == iPar) currentHist->Fill(0); // Count all the resonances decays as primary lambdas
       }
     }
   } // end thermEntries loop
