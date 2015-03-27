@@ -6,7 +6,7 @@
 #include "TBranch.h"
 #include "TTree.h"
 
-bool debug = true;
+bool debug = false;
 class ParticleCoor;
 
 //Was having a problem including a therminator file.
@@ -35,7 +35,8 @@ void simpleLambdaEstimate(char inTFileName[] = "event000.root")
   int eventCounter = -1;
   TH1I *currentHist = NULL;
 
-  int strangePDGs[10] = {3122, //Lambda
+  int nParticleTypes = 10;
+  int strangePDGs[50] = {3122, //Lambda
 			 3212, //Sigma0
 			 3224, //Sigma*+
 			 3214, //Sigma*0
@@ -66,7 +67,12 @@ void simpleLambdaEstimate(char inTFileName[] = "event000.root")
 	//Make a new pair histogram and add it to the vector
 	TString histName = "hParticles";
 	histName += eventCounter;
-	TH1I *hParticles = new TH1I(histName,"Particles Per Type", 10, 0, 10);
+	TH1I *hParticles = new TH1I(histName,"Particles Per Type", nParticleTypes, 0, nParticleTypes);
+	
+	cout<<"test1"<<endl;
+	hParticles->Sumw2();
+	cout<<"test2"<<endl;
+
 	eventParticles.push_back(hParticles);
 	//Now use this histogram
 	currentHist = hParticles;
@@ -76,7 +82,7 @@ void simpleLambdaEstimate(char inTFileName[] = "event000.root")
       if(!CheckIfPassParticleCuts(particleEntry)) continue;
 
       //Check parent info
-      for(int iPar = 0; iPar < 10; iPar++)
+      for(int iPar = 0; iPar < nParticleTypes; iPar++)
       {
 	if(particleEntry->fatherpid == strangePDGs[iPar]) {
 	  currentHist->Fill(iPar);
@@ -87,13 +93,13 @@ void simpleLambdaEstimate(char inTFileName[] = "event000.root")
 			  <<particleEntry->fatherpid<<endl;
       }
     }
-  } // end thermEntreis loop
-
+  } // end thermEntries loop
+  cout<<"finished looping over particles"<<endl;
   //Now that we have found all the strange particles, calculate lambda parameters for each pair type
   double totalLambda = 0.;
-  TH2D *hLambdaPars = new TH2D("LambdaPars", "Lambda Parameters by Pair Type", 10, 0, 10, 10, 0, 10);
-  for(int iPart1 = 0; iPart1 < 10; iPart1++){//First type of particle in pair
-    for(int iPart2 = iPart1; iPart2 < 10; iPart2++){
+  TH2D *hLambdaPars = new TH2D("LambdaPars", "Lambda Parameters by Pair Type", nParticleTypes, 0, nParticleTypes, nParticleTypes, 0, nParticleTypes);
+  for(int iPart1 = 0; iPart1 < nParticleTypes; iPart1++){//First type of particle in pair
+    for(int iPart2 = iPart1; iPart2 < nParticleTypes; iPart2++){
       double lambdaPar = ComputeLambda(iPart1, iPart2, eventParticles);
       hLambdaPars->SetBinContent(iPart1+1, iPart2+1, lambdaPar);
       totalLambda += lambdaPar;
@@ -153,9 +159,6 @@ TH1D *ComputeAverageYields(const vector<TH1I*> &eventParticles)
   //Find the average yields and std deviation for each particle type
   int nEvents = eventParticles.size();
   TH1D *hAvgYields = eventParticles[0]->Clone("AvgYields");
-  cout<<"test1"<<endl;
-  hAvgYields->Sumw2();
-  cout<<"test2"<<endl;
   for(int iEv = 1; iEv < nEvents; iEv++){
     hAvgYields->Add(eventParticles[iEv]);
   }
