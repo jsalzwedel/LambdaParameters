@@ -1,3 +1,19 @@
+//**************************************************
+//
+// Code to estimate lambda parameters using THERMINATOR.  
+// This code runs over THERMINATOR events.  
+// It counts all primary and secondary lambdas in each event, 
+// taking into account some reconstruction cuts.
+// It stores each event multiplicty count in a TH1I.
+// From the TH1I, the code then computes lambda = <N_ij>/<Sum_ij N_ij>, 
+// where N_ij is the number of pairs particles i and j
+// The code also estimates the average multiplicity of each species of lambda.
+//
+// Run the code via .x simpleLambdaEstimate()
+//
+//**************************************************
+
+
 #include <cstdio>
 #include <cassert>
 #include <vector>
@@ -12,15 +28,19 @@ class ParticleCoor;
 //Was having a problem including a therminator file.
 //This fixes it.
 #define _CXX_VER_ "g++(4.9.1)" 
-void simpleLambdaEstimate(char inTFileName[] = "event000.root")
+void simpleLambdaEstimate(TString inputFileName = "event000.root")
 {
+  // Main function, which outputs and saves histograms of 
+  // lambda parameters and average particle multiplicities
+
+
   //Load this therminator class
   gInterpreter->AddIncludePath("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/include");
   gROOT->LoadMacro("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/src/ParticleCoor.cxx");
   
-
-
-  TFile *thermTFile = new TFile(inTFileName, "READ");
+  
+  //Read in the therminator event file and get the particle branch
+  TFile *thermTFile = new TFile(inputFileName, "READ");
   assert(NULL!=thermTFile);
   TTree *thermTree = (TTree*)thermTFile->Get("particles");
   assert(NULL!=thermTree);
@@ -31,10 +51,13 @@ void simpleLambdaEstimate(char inTFileName[] = "event000.root")
 
   //Make a vector to hold a pair count histogram for each event
   std::vector<TH1I*> eventParticles;
-  UInt_t eventID = 0;
+  UInt_t eventID = 0; //This will be set to each event ID (they are not number 1, 2, ...)
   int eventCounter = -1;
   TH1I *currentHist = NULL;
 
+  //Make a list of the PID codes for each particle we care about
+  //We will treat all resonance -> lambda decays as primary lambdas,
+  //so we don't need to include those PDG codes here.
   int nParticleTypes = 5;
   int strangePDGs[50] = {3122, //Lambda
 			 3212, //Sigma0
@@ -54,29 +77,30 @@ void simpleLambdaEstimate(char inTFileName[] = "event000.root")
     //Get the next particle
     int nBytesInEntry = thermTree->GetEntry(i);
     assert(nBytesInEntry>0);
-
-
     if(3122==particleEntry->pid) //Is it a lambda? (primary or secondary are allowed here)
     {
-      //We have reached a new event (or first event)
+      //Make sure the particle passes the reconstruction cuts
+      if(!CheckIfPassParticleCuts(particleEntry)) continue;
+
+      //Check if this is a new event.  If so, we'll need to make a new multiplicity histogram
       if((particleEntry->eventid != eventID) || !currentHist){ 
+	//We have reached a new event (or the first event)
 	cout<<"Previous event: \t"<<eventID<<"\t current event: \t"<<particleEntry->eventid<<endl;
 	eventID = particleEntry->eventid;
 	eventCounter++;
-	if(debug) if(1 == eventCounter) break; //Calc lam with one evt
+	//If debugging, do calculations using a single event
+	if(debug) if(1 == eventCounter) break;
+
 	//Make a new pair histogram and add it to the vector
 	TString histName = "hParticles";
 	histName += eventCounter;
 	TH1I *hParticles = new TH1I(histName,"Particles Per Type", nParticleTypes, 0, nParticleTypes);
 	hParticles->Sumw2();
-
 	eventParticles.push_back(hParticles);
-	//Now use this histogram
+
+	//Now use this histogram in future particle binning
 	currentHist = hParticles;
       }
-      
-      //Make sure the particle passes the reconstruction cuts
-      if(!CheckIfPassParticleCuts(particleEntry)) continue;
 
       //Check parent info
       for(int iPar = 0; iPar < nParticleTypes; iPar++)
@@ -85,26 +109,21 @@ void simpleLambdaEstimate(char inTFileName[] = "event000.root")
 	  currentHist->Fill(iPar);
 	  break;
 	}
-	//Check if lambda comes from some other origin
-	// if(9 == iPar) cout<<"Found lambda with father:\t"
-			  // <<particleEntry->fatherpid<<endl;
+
+	// If we reach the end of the last loop iteration,
+	// that means that the lambda parent isn't in
+	// our short list of PDG codes.  It must be a 
+	// short-lived resonance.  We'll just bin that
+	// as a primary lambda.
 	if(nParticleTypes-1 == iPar) currentHist->Fill(0); // Count all the resonances decays as primary lambdas
       }
-    }
+    } // end is(lambda)?
   } // end thermEntries loop
-  cout<<"finished looping over particles"<<endl;
-  //Now that we have found all the strange particles, calculate lambda parameters for each pair type
-  double totalLambda = 0.;
-  TH2D *hLambdaPars = new TH2D("LambdaPars", "Lambda Parameters by Pair Type", nParticleTypes, 0, nParticleTypes, nParticleTypes, 0, nParticleTypes);
-  for(int iPart1 = 0; iPart1 < nParticleTypes; iPart1++){//First type of particle in pair
-    for(int iPart2 = iPart1; iPart2 < nParticleTypes; iPart2++){
-      double lambdaPar = ComputeLambda(iPart1, iPart2, eventParticles);
-      hLambdaPars->SetBinContent(iPart1+1, iPart2+1, lambdaPar);
-      totalLambda += lambdaPar;
-    }
-  }
+  cout<<"Finished looping over particles"<<endl;
   cout<<"Total events used:\t"<<eventCounter+1<<endl;
-  cout<<"Sum of lambda pars:\t"<<totalLambda<<endl;
+
+  //Now that we have found all the strange particles, calculate lambda parameters for each pair type
+  TH2D* hLambdaPars = GenerateLambdaParHisto(nParticleTypes, eventParticles);
 
   //Draw and save the lambda par histo
   hLambdaPars->DrawCopy("colzTEXT");
@@ -112,29 +131,49 @@ void simpleLambdaEstimate(char inTFileName[] = "event000.root")
   TFile outFile(outfileName,"recreate");
   outFile.cd();
   hLambdaPars->Write();
+ 
+  //Make, draw, and save a histo of average particle yields
   TH1D *hAvgYields = ComputeAverageYields(eventParticles);
   hAvgYields->Write();
   TCanvas *c2 = new TCanvas("yields","Avg Yields");
-  hAvgYields->DrawCopy("text");
+  hAvgYields->DrawCopy("ptext");
   
+}
+
+
+TH2D *GenerateLambdaParHisto(int nParticleTypes, const vector<TH1I*> &eventParticles){
+  // Make a histogram containing lambda paramters for each
+  // pair type
+  double sumLambdaPars = 0.;
+  TH2D *hLambdaPars = new TH2D("LambdaPars", "Lambda Parameters by Pair Type", nParticleTypes, 0, nParticleTypes, nParticleTypes, 0, nParticleTypes);
+  // Loop over each type of pairs, and set the lambda
+  for(int iPart1 = 0; iPart1 < nParticleTypes; iPart1++){//First type of particle in pair
+    for(int iPart2 = iPart1; iPart2 < nParticleTypes; iPart2++){
+      double lambdaPar = ComputeLambda(iPart1, iPart2, eventParticles);
+      hLambdaPars->SetBinContent(iPart1+1, iPart2+1, lambdaPar);
+      sumLambdaPars += lambdaPar;
+    }
+  }
+  //The sum of lambda pars should add up to unity.
+  cout<<"Sum of lambda pars:\t"<<sumLambdaPars<<endl;
+  return hLambdaPars;
 }
 
 double ComputeLambda(const int part1, const int part2, const vector<TH1I*> &eventParticles)
 {
   
-  // Very naive way of calculating <pairs>/<total pairs>
-  // Should probably account somehow for events that have particles==0
+  // Calculate lambda parameter for a given pair type via <N pairs>/<N total pairs>
+  // Should I account somehow for events that have a zero of a certain type of particles?
   int nSpecPairs = 0;
   int nTotalPairs = 0;
   int nEvents = eventParticles.size();
-  // cout<<"Number Events:\n";
 
   for(int iEv = 0; iEv < nEvents; iEv++){ //Sum pairs for each event
-    if(part1 == part2) { //particles with indentical pairs
+    if(part1 == part2) { //pairs of identical (parent) particles
       int nPart1 = eventParticles[iEv]->GetBinContent(part1+1);
       nSpecPairs += nPart1*(nPart1 - 1)/2;
     }
-    else { //pairs of particles with non-identical parents
+    else { //pairs of non-identical (parent) particles
       int nPart1 = eventParticles[iEv]->GetBinContent(part1+1);
       int nPart2 = eventParticles[iEv]->GetBinContent(part2+1);
       nSpecPairs += nPart1*nPart2;
@@ -146,11 +185,12 @@ double ComputeLambda(const int part1, const int part2, const vector<TH1I*> &even
   //Compute average pairs and average total pairs
   double avgSpecPairs = (1.*nSpecPairs) / (1.*nEvents);
   double avgTotalPairs = (1.*nTotalPairs) / (1.*nEvents);
-  // cout<<"avgSpecPairs\t"<<avgSpecPairs
-  //     <<"\tavgTotalPairs\t"<<avgTotalPairs<<endl;
+
   //Return lambda parameter (ratio of avgSpec/avgTotal)
   return avgSpecPairs/avgTotalPairs;
 }
+
+
 
 TH1D *ComputeAverageYields(const vector<TH1I*> &eventParticles)
 {
