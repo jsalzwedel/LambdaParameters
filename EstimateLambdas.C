@@ -29,7 +29,7 @@ class ParticleCoor;
 //This fixes it.
 #define _CXX_VER_ "g++(4.9.1)" 
 
-void simpleLambdaEstimate(int nFiles=2)
+void EstimateLambdas(int nFiles=2)
 {
   // Main function. Generates list of file names
   // and pass them to RunSimpleLambdaEstimate
