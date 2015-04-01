@@ -28,32 +28,50 @@ class ParticleCoor;
 //Was having a problem including a therminator file.
 //This fixes it.
 #define _CXX_VER_ "g++(4.9.1)" 
-void simpleLambdaEstimate(TString inputFileName = "event000.root")
+
+void simpleLambdaEstimate(int nFiles=2)
 {
-  // Main function, which outputs and saves histograms of 
+  // Main function. Generates list of file names
+  // and pass them to RunSimpleLambdaEstimate
+  TString filePath = "/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/events/lhyquid3v-LHCPbPb2760b2.3Ti512t0.60Tf140a0.08b0.08h0.24x2.3v2/";
+  vector<TString> inputFileNames;
+
+  cout<<"\nAnalyzing the following files:\n";
+  for(int iFile = 0; iFile < nFiles; iFile++)
+  {
+    TString fileName = filePath;
+    fileName += "event";
+    if     (iFile <  10) fileName+= "00";
+    else if(iFile < 100) fileName+= "0";
+    fileName += iFile;
+    fileName += ".root";
+    cout<<fileName<<endl;
+    inputFileNames.push_back(fileName);
+  }
+
+  
+  RunSimpleLambdaEstimate(inputFileNames);
+}
+
+
+void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<TString> inputFileNames)
+{
+  // Outputs and saves histograms of 
   // lambda parameters and average particle multiplicities
 
+  int nFiles = inputFileNames.size();
 
   //Load this therminator class
   gInterpreter->AddIncludePath("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/include");
   gROOT->LoadMacro("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/src/ParticleCoor.cxx");
   
-  
-  //Read in the therminator event file and get the particle branch
-  TFile *thermTFile = new TFile(inputFileName, "READ");
-  assert(NULL!=thermTFile);
-  TTree *thermTree = (TTree*)thermTFile->Get("particles");
-  assert(NULL!=thermTree);
-  TBranch *thermBranch = thermTree->GetBranch("particle");
-  ParticleCoor *particleEntry = new ParticleCoor();
-  thermBranch->SetAddress(particleEntry);
-
-
   //Make a vector to hold a pair count histogram for each event
   std::vector<TH1I*> eventParticles;
-  UInt_t eventID = 0; //This will be set to each event ID (they are not number 1, 2, ...)
   int eventCounter = -1;
-  TH1I *currentHist = NULL;
+
+
+  ParticleCoor *particleEntry = new ParticleCoor();
+
 
   //Make a list of the PID codes for each particle we care about
   //We will treat all resonance -> lambda decays as primary lambdas,
@@ -70,55 +88,85 @@ void simpleLambdaEstimate(TString inputFileName = "event000.root")
 			 // 3314, //Xi*-
 			 3334}; //Omega-
 
-  //Loop over all the particles and find the lambdas
-  int nThermEntries = thermTree->GetEntries();
-  for(int i=0; i<nThermEntries; i++)
+  
+  
+  for(int iFile = 0; iFile < nFiles; iFile++)
   {
-    //Get the next particle
-    int nBytesInEntry = thermTree->GetEntry(i);
-    assert(nBytesInEntry>0);
-    if(3122==particleEntry->pid) //Is it a lambda? (primary or secondary are allowed here)
+
+    //If debugging, do calculations using a single event
+    if(debug) if(1 == eventCounter) break;
+
+    //Read in the therminator event file and get the particle branch
+    TFile thermTFile(inputFileNames[iFile], "READ");
+    assert(NULL!=&thermTFile);
+    TTree *thermTree = (TTree*)thermTFile.Get("particles");
+    assert(NULL!=thermTree);
+    TBranch *thermBranch = thermTree->GetBranch("particle");
+    thermBranch->SetAddress(particleEntry);
+
+
+
+
+ 
+ 
+    UInt_t eventID = 0; //This will be set to each event ID (they are not number 1, 2, ...)
+
+    TH1I *currentHist = NULL;
+
+
+
+    //Loop over all the particles and find the lambdas
+    int nThermEntries = thermTree->GetEntries();
+    for(int i=0; i<nThermEntries; i++)
     {
-      //Make sure the particle passes the reconstruction cuts
-      if(!CheckIfPassParticleCuts(particleEntry)) continue;
-
-      //Check if this is a new event.  If so, we'll need to make a new multiplicity histogram
-      if((particleEntry->eventid != eventID) || !currentHist){ 
-	//We have reached a new event (or the first event)
-	cout<<"Previous event: \t"<<eventID<<"\t current event: \t"<<particleEntry->eventid<<endl;
-	eventID = particleEntry->eventid;
-	eventCounter++;
-	//If debugging, do calculations using a single event
-	if(debug) if(1 == eventCounter) break;
-
-	//Make a new pair histogram and add it to the vector
-	TString histName = "hParticles";
-	histName += eventCounter;
-	TH1I *hParticles = new TH1I(histName,"Particles Per Type", nParticleTypes, 0, nParticleTypes);
-	hParticles->Sumw2();
-	eventParticles.push_back(hParticles);
-
-	//Now use this histogram in future particle binning
-	currentHist = hParticles;
-      }
-
-      //Check parent info
-      for(int iPar = 0; iPar < nParticleTypes; iPar++)
+      //Get the next particle
+      int nBytesInEntry = thermTree->GetEntry(i);
+      assert(nBytesInEntry>0);
+      if(3122==particleEntry->pid) //Is it a lambda? (primary or secondary are allowed here)
       {
-	if(particleEntry->fatherpid == strangePDGs[iPar]) {
-	  currentHist->Fill(iPar);
-	  break;
+	//Make sure the particle passes the reconstruction cuts
+	if(!CheckIfPassParticleCuts(particleEntry)) continue;
+
+	//Check if this is a new event.  If so, we'll need to make a new multiplicity histogram
+	if((particleEntry->eventid != eventID) || !currentHist){ 
+	  //We have reached a new event (or the first event)
+	 
+	  eventID = particleEntry->eventid;
+	  eventCounter++;
+	  cout<<"Processing event \t"<<eventCounter<<"\tEvent ID: \t"<<particleEntry->eventid<<endl;
+	  //If debugging, do calculations using a single event
+	  if(debug) if(1 == eventCounter) break;
+
+	  //Make a new pair histogram and add it to the vector
+	  TString histName = "hParticles";
+	  histName += eventCounter;
+	  TH1I *hParticles = new TH1I(histName,"Particles Per Type", nParticleTypes, 0, nParticleTypes);
+	  hParticles->SetDirectory(0); //Disassociate it from the TFile
+	  hParticles->Sumw2();
+	  eventParticles.push_back(hParticles);
+
+	  //Now use this histogram in future particle binning
+	  currentHist = hParticles;
 	}
 
-	// If we reach the end of the last loop iteration,
-	// that means that the lambda parent isn't in
-	// our short list of PDG codes.  It must be a 
-	// short-lived resonance.  We'll just bin that
-	// as a primary lambda.
-	if(nParticleTypes-1 == iPar) currentHist->Fill(0); // Count all the resonances decays as primary lambdas
-      }
-    } // end is(lambda)?
-  } // end thermEntries loop
+	//Check parent info
+	for(int iPar = 0; iPar < nParticleTypes; iPar++)
+	{
+	  if(particleEntry->fatherpid == strangePDGs[iPar]) {
+	    currentHist->Fill(iPar);
+	    break;
+	  }
+
+	  // If we reach the end of the last loop iteration,
+	  // that means that the lambda parent isn't in
+	  // our short list of PDG codes.  It must be a 
+	  // short-lived resonance.  We'll just bin that
+	  // as a primary lambda.
+	  if(nParticleTypes-1 == iPar) currentHist->Fill(0); // Count all the resonances decays as primary lambdas
+	}
+      } // end is(lambda)?
+    } // end loop over particle entries
+  } // end loop over files
   cout<<"Finished looping over particles"<<endl;
   cout<<"Total events used:\t"<<eventCounter+1<<endl;
 
@@ -126,7 +174,7 @@ void simpleLambdaEstimate(TString inputFileName = "event000.root")
   TH2D* hLambdaPars = GenerateLambdaParHisto(nParticleTypes, eventParticles);
 
   //Draw and save the lambda par histo
-  hLambdaPars->DrawCopy("colzTEXT");
+  hLambdaPars->DrawCopy("colzTEXTe");
   TString outfileName = "LambdaPars.root";
   TFile outFile(outfileName,"recreate");
   outFile.cd();
@@ -136,7 +184,7 @@ void simpleLambdaEstimate(TString inputFileName = "event000.root")
   TH1D *hAvgYields = ComputeAverageYields(eventParticles);
   hAvgYields->Write();
   TCanvas *c2 = new TCanvas("yields","Avg Yields");
-  hAvgYields->DrawCopy("ptext");
+  hAvgYields->DrawCopy("ptexte");
   
 }
 
@@ -195,16 +243,55 @@ double ComputeLambda(const int part1, const int part2, const vector<TH1I*> &even
 TH1D *ComputeAverageYields(const vector<TH1I*> &eventParticles)
 {
   //Find the average yields and std deviation for each particle type
+  //Current error bars show the error of the avg calculation, not the
+  //std deviation of the yields
   int nEvents = eventParticles.size();
   TH1D *hAvgYields = eventParticles[0]->Clone("AvgYields");
+  // hAvgYields->Sumw2();
+  TH1D *hAvgSquaredYields = eventParticles[0]->Clone("AvgSqrYields");
+  hAvgSquaredYields->Multiply(eventParticles[0]);
+
   for(int iEv = 1; iEv < nEvents; iEv++){
-    hAvgYields->Add(eventParticles[iEv]);
+    TH1D *hYield = eventParticles[iEv]->Clone();
+    cout<<"Omegas in this event:\t"<<hYield->GetBinContent(hYield->GetNbinsX())<<endl;
+    hAvgYields->Add(hYield);
+    hYield->Multiply(hYield);
+    hAvgSquaredYields->Add(hYield);
+    
+    delete hYield; //Do I need to remove it from a directory first?
   }
+ 
+  // Now that we've summed the yields or yields^2, let's divide
+  // by N_events to get the averages
   hAvgYields->Scale(1./(1.*nEvents));
-  // Compute std deviation...
+  hAvgSquaredYields->Scale(1./(1.*nEvents));
+
+  // TH1D *hStdDeviationYields = CalculateStdDeviationOfYields(hAvgYields, hStdDeviationYields);
+  
+  TH1D *hAvgYieldsSquared = hAvgYields->Clone("AvgYieldsSqr");
+  hAvgYieldsSquared->Multiply(hAvgYieldsSquared);
+  
+  TH1D *hVariance = hAvgSquaredYields;
+  hVariance->Add(hAvgYieldsSquared,-1.);
+
+  //Now take the square root bin by bin and use that as std deviation
+  for(int iBin = 1; iBin <= hVariance->GetNbinsX(); iBin++){
+    double rootVal = hVariance->GetBinContent(iBin);
+    rootVal = sqrt(rootVal);
+    hAvgYields->SetBinError(iBin,rootVal);
+  }
+  
+  delete hAvgSquaredYields;
+  delete hAvgYieldsSquared;
+
   return hAvgYields;
 }
 
+//     void CalculateStdDeviationOfYields(TH1D *hAvgYields, const vector<TH1I*> &eventParticles)
+// {
+  
+
+// }
 
 
 bool CheckIfPassParticleCuts(ParticleCoor *particle)
