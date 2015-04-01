@@ -4,12 +4,12 @@
 // This code runs over THERMINATOR events.  
 // It counts all primary and secondary lambdas in each event, 
 // taking into account some reconstruction cuts.
-// It stores each event multiplicty count in a TH1I.
-// From the TH1I, the code then computes lambda = <N_ij>/<Sum_ij N_ij>, 
+// It stores each event multiplicty count in a TH1D.
+// From the TH1D, the code then computes lambda = <N_ij>/<Sum_ij N_ij>, 
 // where N_ij is the number of pairs particles i and j
 // The code also estimates the average multiplicity of each species of lambda.
 //
-// Run the code via .x simpleLambdaEstimate()
+// Run the code via .x EstimateLambdas()
 //
 //**************************************************
 
@@ -66,7 +66,7 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
   gROOT->LoadMacro("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/src/ParticleCoor.cxx");
   
   //Make a vector to hold a pair count histogram for each event
-  std::vector<TH1I*> eventParticles;
+  std::vector<TH1D*> eventParticles;
   int eventCounter = -1;
 
 
@@ -104,16 +104,9 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
     TBranch *thermBranch = thermTree->GetBranch("particle");
     thermBranch->SetAddress(particleEntry);
 
-
-
-
- 
- 
     UInt_t eventID = 0; //This will be set to each event ID (they are not number 1, 2, ...)
 
-    TH1I *currentHist = NULL;
-
-
+    TH1D *currentHist = NULL;
 
     //Loop over all the particles and find the lambdas
     int nThermEntries = thermTree->GetEntries();
@@ -124,13 +117,14 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
       assert(nBytesInEntry>0);
       if(3122==particleEntry->pid) //Is it a lambda? (primary or secondary are allowed here)
       {
+	// cout<<"test\n";
 	//Make sure the particle passes the reconstruction cuts
 	if(!CheckIfPassParticleCuts(particleEntry)) continue;
-
+	// cout<<"test2\n";
 	//Check if this is a new event.  If so, we'll need to make a new multiplicity histogram
-	if((particleEntry->eventid != eventID) || !currentHist){ 
+	if( (particleEntry->eventid != eventID) || !currentHist){ 
 	  //We have reached a new event (or the first event)
-	 
+	 	// cout<<"test3\n";
 	  eventID = particleEntry->eventid;
 	  eventCounter++;
 	  cout<<"Processing event \t"<<eventCounter<<"\tEvent ID: \t"<<particleEntry->eventid<<endl;
@@ -140,7 +134,7 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
 	  //Make a new pair histogram and add it to the vector
 	  TString histName = "hParticles";
 	  histName += eventCounter;
-	  TH1I *hParticles = new TH1I(histName,"Particles Per Type", nParticleTypes, 0, nParticleTypes);
+	  TH1D *hParticles = new TH1D(histName,"Particles Per Type", nParticleTypes, 0, nParticleTypes);
 	  hParticles->SetDirectory(0); //Disassociate it from the TFile
 	  hParticles->Sumw2();
 	  eventParticles.push_back(hParticles);
@@ -189,7 +183,7 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
 }
 
 
-TH2D *GenerateLambdaParHisto(int nParticleTypes, const vector<TH1I*> &eventParticles){
+TH2D *GenerateLambdaParHisto(int nParticleTypes, const vector<TH1D*> &eventParticles){
   // Make a histogram containing lambda paramters for each
   // pair type
   double sumLambdaPars = 0.;
@@ -207,7 +201,7 @@ TH2D *GenerateLambdaParHisto(int nParticleTypes, const vector<TH1I*> &eventParti
   return hLambdaPars;
 }
 
-double ComputeLambda(const int part1, const int part2, const vector<TH1I*> &eventParticles)
+double ComputeLambda(const int part1, const int part2, const vector<TH1D*> &eventParticles)
 {
   
   // Calculate lambda parameter for a given pair type via <N pairs>/<N total pairs>
@@ -240,7 +234,7 @@ double ComputeLambda(const int part1, const int part2, const vector<TH1I*> &even
 
 
 
-TH1D *ComputeAverageYields(const vector<TH1I*> &eventParticles)
+TH1D *ComputeAverageYields(const vector<TH1D*> &eventParticles)
 {
   //Find the average yields and std deviation for each particle type
   //Current error bars show the error of the avg calculation, not the
@@ -250,17 +244,15 @@ TH1D *ComputeAverageYields(const vector<TH1I*> &eventParticles)
   // hAvgYields->Sumw2();
   TH1D *hAvgSquaredYields = eventParticles[0]->Clone("AvgSqrYields");
   hAvgSquaredYields->Multiply(eventParticles[0]);
-
   for(int iEv = 1; iEv < nEvents; iEv++){
     TH1D *hYield = eventParticles[iEv]->Clone();
-    cout<<"Omegas in this event:\t"<<hYield->GetBinContent(hYield->GetNbinsX())<<endl;
+    // cout<<"Omegas in this event:\t"<<hYield->GetBinContent(hYield->GetNbinsX())<<endl;
     hAvgYields->Add(hYield);
     hYield->Multiply(hYield);
     hAvgSquaredYields->Add(hYield);
     
     delete hYield; //Do I need to remove it from a directory first?
   }
- 
   // Now that we've summed the yields or yields^2, let's divide
   // by N_events to get the averages
   hAvgYields->Scale(1./(1.*nEvents));
@@ -270,8 +262,7 @@ TH1D *ComputeAverageYields(const vector<TH1I*> &eventParticles)
   
   TH1D *hAvgYieldsSquared = hAvgYields->Clone("AvgYieldsSqr");
   hAvgYieldsSquared->Multiply(hAvgYieldsSquared);
-  
-  TH1D *hVariance = hAvgSquaredYields;
+  TH1D *hVariance = hAvgSquaredYields; //Just renaming for clarity
   hVariance->Add(hAvgYieldsSquared,-1.);
 
   //Now take the square root bin by bin and use that as std deviation
@@ -283,16 +274,8 @@ TH1D *ComputeAverageYields(const vector<TH1I*> &eventParticles)
   
   delete hAvgSquaredYields;
   delete hAvgYieldsSquared;
-
   return hAvgYields;
 }
-
-//     void CalculateStdDeviationOfYields(TH1D *hAvgYields, const vector<TH1I*> &eventParticles)
-// {
-  
-
-// }
-
 
 bool CheckIfPassParticleCuts(ParticleCoor *particle)
 {
