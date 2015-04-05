@@ -117,14 +117,11 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
       assert(nBytesInEntry>0);
       if(3122==particleEntry->pid) //Is it a lambda? (primary or secondary are allowed here)
       {
-	// cout<<"test\n";
 	//Make sure the particle passes the reconstruction cuts
 	if(!CheckIfPassParticleCuts(particleEntry)) continue;
-	// cout<<"test2\n";
 	//Check if this is a new event.  If so, we'll need to make a new multiplicity histogram
 	if( (particleEntry->eventid != eventID) || !currentHist){ 
 	  //We have reached a new event (or the first event)
-	 	// cout<<"test3\n";
 	  eventID = particleEntry->eventid;
 	  eventCounter++;
 	  cout<<"Processing event \t"<<eventCounter<<"\tEvent ID: \t"<<particleEntry->eventid<<endl;
@@ -141,7 +138,7 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
 
 	  //Now use this histogram in future particle binning
 	  currentHist = hParticles;
-	}
+-	}
 
 	//Check parent info
 	for(int iPar = 0; iPar < nParticleTypes; iPar++)
