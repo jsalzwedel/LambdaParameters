@@ -48,8 +48,6 @@ void EstimateLambdas(int nFiles=2)
     cout<<fileName<<endl;
     inputFileNames.push_back(fileName);
   }
-
-  
   RunSimpleLambdaEstimate(inputFileNames);
 }
 
@@ -138,7 +136,7 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
 
 	  //Now use this histogram in future particle binning
 	  currentHist = hParticles;
--	}
+	}
 
 	//Check parent info
 	for(int iPar = 0; iPar < nParticleTypes; iPar++)
@@ -163,6 +161,8 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
 
   //Now that we have found all the strange particles, calculate lambda parameters for each pair type
   TH2D* hLambdaPars = GenerateLambdaParHisto(nParticleTypes, eventParticles);
+  SetLambdaHistAxisLabels(hLambdaPars->GetXaxis());
+  SetLambdaHistAxisLabels(hLambdaPars->GetYaxis());
 
   //Draw and save the lambda par histo
   hLambdaPars->DrawCopy("colzTEXTe");
@@ -173,6 +173,7 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
  
   //Make, draw, and save a histo of average particle yields
   TH1D *hAvgYields = ComputeAverageYields(eventParticles);
+  SetLambdaHistAxisLabels(hAvgYields->GetXaxis());
   hAvgYields->Write();
   TCanvas *c2 = new TCanvas("yields","Avg Yields");
   hAvgYields->DrawCopy("ptexte");
@@ -188,8 +189,11 @@ TH2D *GenerateLambdaParHisto(int nParticleTypes, const vector<TH1D*> &eventParti
   // Loop over each type of pairs, and set the lambda
   for(int iPart1 = 0; iPart1 < nParticleTypes; iPart1++){//First type of particle in pair
     for(int iPart2 = iPart1; iPart2 < nParticleTypes; iPart2++){
-      double lambdaPar = ComputeLambda(iPart1, iPart2, eventParticles);
+      double lambdaPar = -1.;
+      double lambdaParError = 1.;
+      ComputeLambda(iPart1, iPart2, eventParticles, lambdaPar, lambdaParError);
       hLambdaPars->SetBinContent(iPart1+1, iPart2+1, lambdaPar);
+      hLambdaPars->SetBinError(iPart1+1, iPart2+1, lambdaParError);
       sumLambdaPars += lambdaPar;
     }
   }
@@ -198,7 +202,7 @@ TH2D *GenerateLambdaParHisto(int nParticleTypes, const vector<TH1D*> &eventParti
   return hLambdaPars;
 }
 
-double ComputeLambda(const int part1, const int part2, const vector<TH1D*> &eventParticles)
+void ComputeLambda(const int part1, const int part2, const vector<TH1D*> &eventParticles, double &lambda, double &lambdaError)
 {
   
   // Calculate lambda parameter for a given pair type via <N pairs>/<N total pairs>
@@ -225,10 +229,45 @@ double ComputeLambda(const int part1, const int part2, const vector<TH1D*> &even
   double avgSpecPairs = (1.*nSpecPairs) / (1.*nEvents);
   double avgTotalPairs = (1.*nTotalPairs) / (1.*nEvents);
 
-  //Return lambda parameter (ratio of avgSpec/avgTotal)
-  return avgSpecPairs/avgTotalPairs;
+  // Find lambda (ratio of avgSpec/avgTotal) and error
+  lambda = avgSpecPairs/avgTotalPairs;
+  lambdaError = ComputeLambdaError(part1, part2, eventParticles, avgTotalPairs, lambda);
+  return;
 }
 
+double ComputeLambdaError(const int part1, const int part2, const vector<TH1D*> &eventParticles, const double avgTotalPairs, const double lambda)
+{
+  //Compute and return the mean error for a given lambda parameter
+  
+  //Different formulae for identical particles vs non-identical particles
+  double errSqr = 0.;
+  double nEvents = eventParticles.size();
+  
+  // Sum in quadrature the error coming from each particle yield in each event
+  // See lab notebook for details of error calculation
+  if(part1 == part2){
+    for(int iEv = 0; iEv < nEvents; iEv++){
+      double nTotalYield = eventParticles[iEv]->Integral();
+      double p1Yield = eventParticles[iEv]->GetBinContent(part1+1);
+      errSqr += pow(lambda,2) * nTotalYield * pow( (0.5 - nTotalYield) ,2);
+      errSqr += p1Yield * (p1Yield - 0.5) * (p1Yield - 0.5 + lambda * (0.5 - nTotalYield) );
+    }
+  }
+  else{
+    for(int iEv = 0; iEv < nEvents; iEv++){
+      double nTotalYield = eventParticles[iEv]->Integral();
+      double p1Yield = eventParticles[iEv]->GetBinContent(part1+1);
+      double p2Yield = eventParticles[iEv]->GetBinContent(part2+1);
+      errSqr += pow(lambda,2) * nTotalYield * pow( (0.5 - nTotalYield) ,2);
+      errSqr += pow(p1Yield,2) * ( p1Yield + lambda * (0.5 - nTotalYield) );
+      errSqr += pow(p2Yield,2) * ( p2Yield + lambda * (0.5 - nTotalYield) );
+    }
+  }
+  errSqr /= pow(nEvents,2);
+  errSqr /= pow(avgTotalPairs,2);
+
+  return sqrt(errSqr);
+}
 
 
 TH1D *ComputeAverageYields(const vector<TH1D*> &eventParticles)
@@ -238,7 +277,6 @@ TH1D *ComputeAverageYields(const vector<TH1D*> &eventParticles)
   //std deviation of the yields
   int nEvents = eventParticles.size();
   TH1D *hAvgYields = eventParticles[0]->Clone("AvgYields");
-  // hAvgYields->Sumw2();
   TH1D *hAvgSquaredYields = eventParticles[0]->Clone("AvgSqrYields");
   hAvgSquaredYields->Multiply(eventParticles[0]);
   for(int iEv = 1; iEv < nEvents; iEv++){
@@ -282,4 +320,16 @@ bool CheckIfPassParticleCuts(ParticleCoor *particle)
 
   //If we make it here, the particle passed all the cuts
   return true;
+}
+
+void SetLambdaHistAxisLabels(TAxis *axis)
+{
+  // Use LaTeX to set the bin labels to their
+  // corresponding particles
+  axis->SetBinLabel(1,"#Lambda");
+  axis->SetBinLabel(2,"#Sigma^{0}");
+  axis->SetBinLabel(3,"#Xi^{0}");
+  axis->SetBinLabel(4,"#Xi^{-}");
+  axis->SetBinLabel(5,"#Omega");
+  axis->SetLabelSize(0.06);
 }
