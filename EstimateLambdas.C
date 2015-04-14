@@ -202,26 +202,42 @@ TH2D *GenerateLambdaParHisto(int nParticleTypes, const vector<TH1D*> &eventParti
   return hLambdaPars;
 }
 
-void ComputeLambda(const int part1, const int part2, const vector<TH1D*> &eventParticles, double &lambda, double &lambdaError)
+void ComputeLambda(const int part1, const int part2, const vector<TH1D*> &eventParticles1, double &lambda, double &lambdaError)
 {
   
   // Calculate lambda parameter for a given pair type via <N pairs>/<N total pairs>
   // Should I account somehow for events that have a zero of a certain type of particles?
+  bool identical = false;
+  if(&eventParticles1 == &eventParticles2) ComputeLambdaIdentical(part1, part2, eventParticles1, double& lambda, double &lambdaError);
+  else ComputeLambdaNonIdentical(part1, part2, eventParticles1, eventParticles2, double& lambda, double &lambdaError)
+
+
+}
+
+ 
+void ComputeLambdaIdentical(const int part1, const int part2, const vector<TH1D*> &eventParticles1, double &lambda, double &lambdaError)
+{
+  
+  // For identical particles (all particle or all antiparticle), 
+  // calculate lambda parameter for a given pair type via 
+  // <N pairs>/<N total pairs>
+
   int nSpecPairs = 0;
   int nTotalPairs = 0;
-  int nEvents = eventParticles.size();
+  int nEvents = eventParticles1.size();
 
-  for(int iEv = 0; iEv < nEvents; iEv++){ //Sum pairs for each event
+  for(int iEv = 0; iEv < nEvents; iEv++){ 
+    // Sum pairs for each event
     if(part1 == part2) { //pairs of identical (parent) particles
-      int nPart1 = eventParticles[iEv]->GetBinContent(part1+1);
+      int nPart1 = eventParticles1[iEv]->GetBinContent(part1+1);
       nSpecPairs += nPart1*(nPart1 - 1)/2;
     }
     else { //pairs of non-identical (parent) particles
-      int nPart1 = eventParticles[iEv]->GetBinContent(part1+1);
-      int nPart2 = eventParticles[iEv]->GetBinContent(part2+1);
+      int nPart1 = eventParticles1[iEv]->GetBinContent(part1+1);
+      int nPart2 = eventParticles1[iEv]->GetBinContent(part2+1);
       nSpecPairs += nPart1*nPart2;
     }
-    int totalPart = eventParticles[iEv]->GetEntries();
+    int totalPart = eventParticles1[iEv]->GetEntries();
     nTotalPairs += totalPart * (totalPart - 1)/2;
   } //end looping over events
     
@@ -231,7 +247,43 @@ void ComputeLambda(const int part1, const int part2, const vector<TH1D*> &eventP
 
   // Find lambda (ratio of avgSpec/avgTotal) and error
   lambda = avgSpecPairs/avgTotalPairs;
-  lambdaError = ComputeLambdaError(part1, part2, eventParticles, avgTotalPairs, lambda);
+  lambdaError = ComputeLambdaIdenticalError(part1, part2, eventParticles1, avgTotalPairs, lambda);
+  return;
+}
+
+void ComputeLambdaNonIdentical(const int part1, const int part2, const vector<TH1D*> &eventParticles1, const vector<TH1D*> &eventParticles2, double &lambda, double &lambdaError)
+{
+  
+  // For mix of particles-antiparticles, 
+  // calculate lambda parameter for a given pair type via 
+  // <N pairs>/<N total pairs>
+
+  int nSpecPairs = 0;
+  int nTotalPairs = 0;
+  int nEvents = eventParticles1.size();
+  int nEffectiveEvents = 0;
+
+  for(int iEv = 0; iEv < nEvents; iEv++){
+    // Sum pairs for each event
+
+    // Ignore events where you have no particles or no antiparticles
+    if(0 == eventParticles1[iEv]->GetEntries()) continue;
+    if(0 == eventParticles2[iEv]->GetEntries()) continue;
+    nEffectiveEvents++;
+    int nPart1 = eventParticles1[iEv]->GetBinContent(part1+1);
+    int nPart2 = eventParticles2[iEv]->GetBinContent(part2+1);
+    nSpecPairs += nPart1*nPart2;
+    nTotalPairs += eventParticles1[iEv]->GetEntries() 
+      * eventParticles2[iEv]->GetEntries();
+  } //end looping over events
+    
+  //Compute average pairs and average total pairs
+  double avgSpecPairs = (1.*nSpecPairs) / (1.*nEffectiveEvents);
+  double avgTotalPairs = (1.*nTotalPairs) / (1.*nEffectiveEvents);
+
+  // Find lambda (ratio of avgSpec/avgTotal) and error
+  lambda = avgSpecPairs/avgTotalPairs;
+  lambdaError = ComputeLambdaNonIdenticalError(part1, part2, eventParticles1, eventParticles2, avgTotalPairs, lambda);
   return;
 }
 
