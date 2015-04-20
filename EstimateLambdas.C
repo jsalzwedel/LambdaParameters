@@ -126,7 +126,7 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
 	  //If debugging, do calculations using a single event
 	  if(debug) if(1 == eventCounter) break;
 
-	  //Make a new pair histogram and add it to the vector
+	  //Make a new particle histogram and add it to the vector
 	  TString histName = "hParticles";
 	  histName += eventCounter;
 	  TH1D *hParticles = new TH1D(histName,"Particles Per Type", nParticleTypes, 0, nParticleTypes);
@@ -225,8 +225,13 @@ void ComputeLambdaIdentical(const int part1, const int part2, const vector<TH1D*
   int nSpecPairs = 0;
   int nTotalPairs = 0;
   int nEvents = eventParticles1.size();
+  int nEffectiveEvents = 0;
 
   for(int iEv = 0; iEv < nEvents; iEv++){ 
+    double nTotalYield = eventParticles1[iEv]->Integral();
+    if(1 >= nTotalYield) continue;
+    nEffectiveEvents++;
+
     // Sum pairs for each event
     if(part1 == part2) { //pairs of identical (parent) particles
       int nPart1 = eventParticles1[iEv]->GetBinContent(part1+1);
@@ -237,13 +242,13 @@ void ComputeLambdaIdentical(const int part1, const int part2, const vector<TH1D*
       int nPart2 = eventParticles1[iEv]->GetBinContent(part2+1);
       nSpecPairs += nPart1*nPart2;
     }
-    int totalPart = eventParticles1[iEv]->GetEntries();
+    int totalPart = eventParticles1[iEv]->Integral();
     nTotalPairs += totalPart * (totalPart - 1)/2;
   } //end looping over events
     
   //Compute average pairs and average total pairs
-  double avgSpecPairs = (1.*nSpecPairs) / (1.*nEvents);
-  double avgTotalPairs = (1.*nTotalPairs) / (1.*nEvents);
+  double avgSpecPairs = (1.*nSpecPairs) / (1.*nEffectiveEvents);
+  double avgTotalPairs = (1.*nTotalPairs) / (1.*nEffectiveEvents);
 
   // Find lambda (ratio of avgSpec/avgTotal) and error
   lambda = avgSpecPairs/avgTotalPairs;
@@ -267,14 +272,15 @@ void ComputeLambdaNonIdentical(const int part1, const int part2, const vector<TH
     // Sum pairs for each event
 
     // Ignore events where you have no particles or no antiparticles
-    if(0 == eventParticles1[iEv]->GetEntries()) continue;
-    if(0 == eventParticles2[iEv]->GetEntries()) continue;
+    const double nTotalParticles = eventParticles1[iEv]->Integral();
+    const double nTotalAntiParticles = eventParticles2[iEv]->Integral()
+    if(0 == nTotalParticles) continue;
+    if(0 == nTotalAntiParticles) continue;
     nEffectiveEvents++;
-    int nPart1 = eventParticles1[iEv]->GetBinContent(part1+1);
-    int nPart2 = eventParticles2[iEv]->GetBinContent(part2+1);
+    const int nPart1 = eventParticles1[iEv]->GetBinContent(part1+1);
+    const int nPart2 = eventParticles2[iEv]->GetBinContent(part2+1);
     nSpecPairs += nPart1*nPart2;
-    nTotalPairs += eventParticles1[iEv]->GetEntries() 
-      * eventParticles2[iEv]->GetEntries();
+    nTotalPairs += nTotalParticles * nTotalAntiParticles;
   } //end looping over events
     
   //Compute average pairs and average total pairs
@@ -295,12 +301,17 @@ double ComputeLambdaIdenticalError(const int part1, const int part2, const vecto
   // (See ComputeLambdaNonIdenticalError for particle-antiparticle error)
   double errSqr = 0.;
   double nEvents = eventParticles.size();
-  
+  int nEffectiveEvents = 0;
+
+
   // Sum in quadrature the error coming from each particle yield in each event
   // See lab notebook for details of error calculation
   if(part1 == part2){
     for(int iEv = 0; iEv < nEvents; iEv++){
       double nTotalYield = eventParticles[iEv]->Integral();
+      if(1 >= nTotalYield) continue;
+      nEffectiveEvents++;
+
       double p1Yield = eventParticles[iEv]->GetBinContent(part1+1);
       errSqr += pow(lambda,2) * nTotalYield * pow( (0.5 - nTotalYield) ,2);
       errSqr += p1Yield * (p1Yield - 0.5) * (p1Yield - 0.5 + lambda * (0.5 - nTotalYield) );
@@ -315,41 +326,42 @@ double ComputeLambdaIdenticalError(const int part1, const int part2, const vecto
       errSqr += pow(lambda,2) * nTotalYield * pow( (nTotalYield - 0.5), 2)
     }
   }
-  errSqr /= pow(nEvents,2);
+  errSqr /= pow(nEffectiveEvents,2);
   errSqr /= pow(avgTotalPairs,2);
 
   return sqrt(errSqr);
 }
 
-double ComputeLambdaError(const int part1, const int part2, const vector<TH1D*> &eventParticles, const double avgTotalPairs, const double lambda)
+double ComputeLambdaNonIdenticalError(const int part1, const int part2, const vector<TH1D*> &eventParticles1, const vector<TH1D*> &eventParticles2, const double avgTotalPairs, const double lambda)
 {
   //Compute and return the mean error for a given lambda parameter
   
   //Different formulae for identical particles vs non-identical particles
   double errSqr = 0.;
-  double nEvents = eventParticles.size();
+  double nEvents = eventParticles1.size();
+  int nEffectiveEvents = 0;
   
   // Sum in quadrature the error coming from each particle yield in each event
   // See lab notebook for details of error calculation
-  if(part1 == part2){
-    for(int iEv = 0; iEv < nEvents; iEv++){
-      double nTotalYield = eventParticles[iEv]->Integral();
-      double p1Yield = eventParticles[iEv]->GetBinContent(part1+1);
-      errSqr += pow(lambda,2) * nTotalYield * pow( (0.5 - nTotalYield) ,2);
-      errSqr += p1Yield * (p1Yield - 0.5) * (p1Yield - 0.5 + lambda * (0.5 - nTotalYield) );
-    }
+
+  for(int iEv = 0; iEv < nEvents; iEv++){
+
+    // Ignore events where you have no particles or no antiparticles
+    const double nTotalYieldParticles = eventParticles1[iEv]->Integral();
+    const double nTotalYieldAntiParticles = eventParticles2[iEv]->Integral();
+
+    if(0 == nTotalYieldParticles) continue;
+    if(0 == nTotalYieldAntiParticles) continue;
+    nEffectiveEvents++;
+
+    const double p1Yield = eventParticles1[iEv]->GetBinContent(part1+1);
+    const double p2Yield = eventParticles2[iEv]->GetBinContent(part2+1);
+    
+    errSqr += p1Yield * p2Yield * (p1Yield + p2Yield - lambda * (nTotalYieldParticles + nTotalYieldAntiParticles));
+    errSqr += pow(lambda,2) * nTotalYieldAntiParticles * nTotalYieldParticles * (nTotalYieldParticles + nTotalYieldAntiParticles);
   }
-  else{
-    for(int iEv = 0; iEv < nEvents; iEv++){
-      double nTotalYield = eventParticles[iEv]->Integral();
-      double p1Yield = eventParticles[iEv]->GetBinContent(part1+1);
-      double p2Yield = eventParticles[iEv]->GetBinContent(part2+1);
-      errSqr += pow(lambda,2) * nTotalYield * pow( (0.5 - nTotalYield) ,2);
-      errSqr += pow(p1Yield,2) * ( p1Yield + lambda * (0.5 - nTotalYield) );
-      errSqr += pow(p2Yield,2) * ( p2Yield + lambda * (0.5 - nTotalYield) );
-    }
-  }
-  errSqr /= pow(nEvents,2);
+
+  errSqr /= pow(nEffectiveEvents,2);
   errSqr /= pow(avgTotalPairs,2);
 
   return sqrt(errSqr);
