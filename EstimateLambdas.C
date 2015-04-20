@@ -287,6 +287,40 @@ void ComputeLambdaNonIdentical(const int part1, const int part2, const vector<TH
   return;
 }
 
+double ComputeLambdaIdenticalError(const int part1, const int part2, const vector<TH1D*> &eventParticles, const double avgTotalPairs, const double lambda)
+{
+  // Compute and return the mean error for a given lambda parameter
+  
+  // Different formulae for identical particles vs non-identical particles
+  // (See ComputeLambdaNonIdenticalError for particle-antiparticle error)
+  double errSqr = 0.;
+  double nEvents = eventParticles.size();
+  
+  // Sum in quadrature the error coming from each particle yield in each event
+  // See lab notebook for details of error calculation
+  if(part1 == part2){
+    for(int iEv = 0; iEv < nEvents; iEv++){
+      double nTotalYield = eventParticles[iEv]->Integral();
+      double p1Yield = eventParticles[iEv]->GetBinContent(part1+1);
+      errSqr += pow(lambda,2) * nTotalYield * pow( (0.5 - nTotalYield) ,2);
+      errSqr += p1Yield * (p1Yield - 0.5) * (p1Yield - 0.5 + lambda * (0.5 - nTotalYield) );
+    }
+  }
+  else{
+    for(int iEv = 0; iEv < nEvents; iEv++){
+      double nTotalYield = eventParticles[iEv]->Integral();
+      double p1Yield = eventParticles[iEv]->GetBinContent(part1+1);
+      double p2Yield = eventParticles[iEv]->GetBinContent(part2+1);
+      errSqr += p1Yield * p2Yield * (p1Yield + p2Yield - 2*lambda * (nTotalYield - 0.5));
+      errSqr += pow(lambda,2) * nTotalYield * pow( (nTotalYield - 0.5), 2)
+    }
+  }
+  errSqr /= pow(nEvents,2);
+  errSqr /= pow(avgTotalPairs,2);
+
+  return sqrt(errSqr);
+}
+
 double ComputeLambdaError(const int part1, const int part2, const vector<TH1D*> &eventParticles, const double avgTotalPairs, const double lambda)
 {
   //Compute and return the mean error for a given lambda parameter
