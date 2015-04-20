@@ -52,30 +52,65 @@ void EstimateLambdas(int nFiles=2)
 }
 
 
-void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<TString> inputFileNames)
+void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<TString> inputFileNames, const bool isAntipart1, const bool isAntipart2)
 {
   // Outputs and saves histograms of 
   // lambda parameters and average particle multiplicities
 
-  int nFiles = inputFileNames.size();
+  vector<TH1D*> eventParticles1;
+  vector<TH1D*> secondParticleCollection; //Only use this if we want to estimate particle-antiparticle lambda parameters
+  
+  vector<TH1D*> &eventParticles2 = eventParticles1;
+  bool isPartAntipartPairs = false;
+  if(isAntipart1 != isAntipart2) {
+    &eventParticles2 = secondParticleCollection; //We do have separate particles and antiparticles
+    isPartAntipartPairs = true;
+  }
 
+  GenerateEventParticleVectors(inputFileNames, eventParticles1, eventParticles2, isAntiPart1, isPartAntipartPairs)
+
+  //Now that we have found all the strange particles, calculate lambda parameters for each pair type
+  TH2D* hLambdaPars = GenerateLambdaParHisto(nParticleTypes, eventParticles1, eventParticles2);
+  SetLambdaHistAxisLabels(hLambdaPars->GetXaxis());
+  SetLambdaHistAxisLabels(hLambdaPars->GetYaxis());
+
+  //Draw and save the lambda par histo
+  hLambdaPars->DrawCopy("colzTEXTe");
+  TString outfileName = "LambdaPars.root";
+  TFile outFile(outfileName,"recreate");
+  outFile.cd();
+  hLambdaPars->Write();
+ 
+  //Make, draw, and save a histo of average particle yields
+  TH1D *hAvgYields = ComputeAverageYields(eventParticles);
+  SetLambdaHistAxisLabels(hAvgYields->GetXaxis());
+  hAvgYields->Write();
+  TCanvas *c2 = new TCanvas("yields","Avg Yields");
+  hAvgYields->DrawCopy("ptexte");
+  
+}
+
+void GenerateEventParticleVectors(vector<TString> &inputFileNames, vector<TH1D*> &eventParticles1, vector<TH1D*> &eventParticles2, bool isAntipart1, bool isPartAntipartPairs)
+{
   //Load this therminator class
   gInterpreter->AddIncludePath("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/include");
   gROOT->LoadMacro("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/src/ParticleCoor.cxx");
   
   //Make a vector to hold a pair count histogram for each event
-  std::vector<TH1D*> eventParticles;
+
   int eventCounter = -1;
 
+  
 
-  ParticleCoor *particleEntry = new ParticleCoor();
+  // ******************************** WIP *******************************
+  
 
 
   //Make a list of the PID codes for each particle we care about
   //We will treat all resonance -> lambda decays as primary lambdas,
   //so we don't need to include those PDG codes here.
   int nParticleTypes = 5;
-  int strangePDGs[50] = {3122, //Lambda
+  int strangePDGs[5] = {3122, //Lambda
 			 3212, //Sigma0
 			 // 3224, //Sigma*+
 			 // 3214, //Sigma*0
@@ -87,7 +122,8 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
 			 3334}; //Omega-
 
   
-  
+  ParticleCoor *particleEntry = new ParticleCoor();
+  int nFiles = inputFileNames.size();
   for(int iFile = 0; iFile < nFiles; iFile++)
   {
 
@@ -159,25 +195,6 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
   cout<<"Finished looping over particles"<<endl;
   cout<<"Total events used:\t"<<eventCounter+1<<endl;
 
-  //Now that we have found all the strange particles, calculate lambda parameters for each pair type
-  TH2D* hLambdaPars = GenerateLambdaParHisto(nParticleTypes, eventParticles);
-  SetLambdaHistAxisLabels(hLambdaPars->GetXaxis());
-  SetLambdaHistAxisLabels(hLambdaPars->GetYaxis());
-
-  //Draw and save the lambda par histo
-  hLambdaPars->DrawCopy("colzTEXTe");
-  TString outfileName = "LambdaPars.root";
-  TFile outFile(outfileName,"recreate");
-  outFile.cd();
-  hLambdaPars->Write();
- 
-  //Make, draw, and save a histo of average particle yields
-  TH1D *hAvgYields = ComputeAverageYields(eventParticles);
-  SetLambdaHistAxisLabels(hAvgYields->GetXaxis());
-  hAvgYields->Write();
-  TCanvas *c2 = new TCanvas("yields","Avg Yields");
-  hAvgYields->DrawCopy("ptexte");
-  
 }
 
 
