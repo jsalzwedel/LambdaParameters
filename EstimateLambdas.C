@@ -181,14 +181,19 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
 }
 
 
-TH2D *GenerateLambdaParHisto(int nParticleTypes, const vector<TH1D*> &eventParticles){
-  // Make a histogram containing lambda paramters for each
+TH2D *GenerateLambdaParHisto(int nParticleTypes, const vector<TH1D*> &eventParticles1, const vector<TH1D*> &eventParticles2){
+  // Make a histogram containing lambda parameters for each
   // pair type
   double sumLambdaPars = 0.;
   TH2D *hLambdaPars = new TH2D("LambdaPars", "Lambda Parameters by Pair Type", nParticleTypes, 0, nParticleTypes, nParticleTypes, 0, nParticleTypes);
+  bool isPartAntipart = true;
+  if(&eventParticles1 == &eventParticles2) isPartAntipart = false;
+
   // Loop over each type of pairs, and set the lambda
   for(int iPart1 = 0; iPart1 < nParticleTypes; iPart1++){//First type of particle in pair
-    for(int iPart2 = iPart1; iPart2 < nParticleTypes; iPart2++){
+    int iter2 = iPart1;
+    if(isPartAntipart) iter2 = 0;
+    for(int iPart2 = iter2; iPart2 < nParticleTypes; iPart2++){
       double lambdaPar = -1.;
       double lambdaParError = 1.;
       ComputeLambda(iPart1, iPart2, eventParticles, lambdaPar, lambdaParError);
@@ -202,24 +207,20 @@ TH2D *GenerateLambdaParHisto(int nParticleTypes, const vector<TH1D*> &eventParti
   return hLambdaPars;
 }
 
-void ComputeLambda(const int part1, const int part2, const vector<TH1D*> &eventParticles1, double &lambda, double &lambdaError)
+void ComputeLambda(const int part1, const int part2, const vector<TH1D*> &eventParticles1, const vector<TH1D*> &eventParticles2, double &lambda, double &lambdaError)
 {
-  
-  // Calculate lambda parameter for a given pair type via <N pairs>/<N total pairs>
-  // Should I account somehow for events that have a zero of a certain type of particles?
+  //Determine whether we are computing lambda for particle-particle (anti-anti) or particle-antiparticle, then calculate the corresponding lambda parameter and lambda error bars.
   bool identical = false;
-  if(&eventParticles1 == &eventParticles2) ComputeLambdaIdentical(part1, part2, eventParticles1, double& lambda, double &lambdaError);
-  else ComputeLambdaNonIdentical(part1, part2, eventParticles1, eventParticles2, double& lambda, double &lambdaError)
-
-
+  if(&eventParticles1 == &eventParticles2) ComputeLambdaIdentical(part1, part2, eventParticles1, lambda, lambdaError);
+  else ComputeLambdaNonIdentical(part1, part2, eventParticles1, eventParticles2, lambda, lambdaError)
 }
 
  
 void ComputeLambdaIdentical(const int part1, const int part2, const vector<TH1D*> &eventParticles1, double &lambda, double &lambdaError)
 {
   
-  // For identical particles (all particle or all antiparticle), 
-  // calculate lambda parameter for a given pair type via 
+  // For identical particles (all particle or all antiparticle).
+  // Calculate lambda parameter for a given pair type via 
   // <N pairs>/<N total pairs>
 
   int nSpecPairs = 0;
@@ -259,8 +260,8 @@ void ComputeLambdaIdentical(const int part1, const int part2, const vector<TH1D*
 void ComputeLambdaNonIdentical(const int part1, const int part2, const vector<TH1D*> &eventParticles1, const vector<TH1D*> &eventParticles2, double &lambda, double &lambdaError)
 {
   
-  // For mix of particles-antiparticles, 
-  // calculate lambda parameter for a given pair type via 
+  // For mix of particles-antiparticles.
+  // Calculate lambda parameter for a given pair type via 
   // <N pairs>/<N total pairs>
 
   int nSpecPairs = 0;
