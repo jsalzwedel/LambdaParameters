@@ -71,8 +71,8 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
 
   //Now that we have found all the strange particles, calculate lambda parameters for each pair type
   TH2D* hLambdaPars = GenerateLambdaParHisto(nParticleTypes, eventParticles1, eventParticles2);
-  SetLambdaHistAxisLabels(hLambdaPars->GetXaxis());
-  SetLambdaHistAxisLabels(hLambdaPars->GetYaxis());
+  SetLambdaHistAxisLabels(hLambdaPars->GetXaxis(),isAntipart1);
+  SetLambdaHistAxisLabels(hLambdaPars->GetYaxis(),isAntipart2);
 
   //Draw and save the lambda par histo
   hLambdaPars->DrawCopy("colzTEXTe");
@@ -83,7 +83,7 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
  
   //Make, draw, and save a histo of average particle yields
   TH1D *hAvgYields = ComputeAverageYields(eventParticles);
-  SetLambdaHistAxisLabels(hAvgYields->GetXaxis());
+  SetLambdaHistAxisLabels(hAvgYields->GetXaxis(),isAntipart1);
   hAvgYields->Write();
   TCanvas *c2 = new TCanvas("yields","Avg Yields");
   hAvgYields->DrawCopy("ptexte");
@@ -438,14 +438,23 @@ bool CheckIfPassParticleCuts(ParticleCoor *particle)
   return true;
 }
 
-void SetLambdaHistAxisLabels(TAxis *axis)
+void SetLambdaHistAxisLabels(TAxis *axis, bool isAntiparticle)
 {
   // Use LaTeX to set the bin labels to their
   // corresponding particles
-  axis->SetBinLabel(1,"#Lambda");
-  axis->SetBinLabel(2,"#Sigma^{0}");
-  axis->SetBinLabel(3,"#Xi^{0}");
-  axis->SetBinLabel(4,"#Xi^{-}");
-  axis->SetBinLabel(5,"#Omega");
+  if(!isAntiparticle){
+    axis->SetBinLabel(1,"#Lambda");
+    axis->SetBinLabel(2,"#Sigma^{0}");
+    axis->SetBinLabel(3,"#Xi^{0}");
+    axis->SetBinLabel(4,"#Xi^{-}");
+    axis->SetBinLabel(5,"#Omega");
+  }
+  else {
+    axis->SetBinLabel(1,"#bar{#Lambda}");
+    axis->SetBinLabel(2,"#bar{#Sigma}^{0}");
+    axis->SetBinLabel(3,"#bar{#Xi}^{0}");
+    axis->SetBinLabel(4,"#bar{#Xi}^{+}");
+    axis->SetBinLabel(5,"#bar{#Omega}");
+  }
   axis->SetLabelSize(0.06);
 }
