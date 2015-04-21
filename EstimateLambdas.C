@@ -75,16 +75,25 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
   //Draw and save the lambda par histo
   hLambdaPars->DrawCopy("colzTEXTe");
   TString outfileName = "LambdaPars.root";
-  TFile outFile(outfileName,"recreate");
+
+  TFile outFile(outfileName,"update");
   outFile.cd();
-  hLambdaPars->Write();
+  hLambdaPars->Write(kOverwrite);
  
   //Make, draw, and save a histo of average particle yields
-  TH1D *hAvgYields = ComputeAverageYields(eventParticles);
+  TH1D *hAvgYields = ComputeAverageYields(eventParticles1,isAntipart1);
   SetLambdaHistAxisLabels(hAvgYields->GetXaxis(),isAntipart1);
-  hAvgYields->Write();
+  hAvgYields->Write(kOverwrite);
   TCanvas *c2 = new TCanvas("yields","Avg Yields");
   hAvgYields->DrawCopy("ptexte");
+
+  if(isAntiPart1 != isAntipart2) {
+    TH1D *hAvgYieldsAnti = ComputeAverageYields(eventParticles1,isAntipart2);
+    SetLambdaHistAxisLabels(hAvgYieldsAnti->GetXaxis(),isAntipart2);
+    hAvgYieldsAnti->Write(kOverwrite);
+    TCanvas *c3 = new TCanvas("yieldsAnti","Avg Yields Antiparticles");
+    hAvgYieldsAnti->DrawCopy("ptexte");
+  }
   
 }
 
@@ -225,13 +234,19 @@ void GenerateEventParticleHistograms(vector<TString> &inputFileNames, vector<TH1
 }
 
 
-TH2D *GenerateLambdaParHisto(int nParticleTypes, const vector<TH1D*> &eventParticles1, const vector<TH1D*> &eventParticles2){
+TH2D *GenerateLambdaParHisto(int nParticleTypes, const vector<TH1D*> &eventParticles1, const vector<TH1D*> &eventParticles2, const bool isAntipart1, const bool isAntipart2){
   // Make a histogram containing lambda parameters for each
   // pair type
   double sumLambdaPars = 0.;
-  TH2D *hLambdaPars = new TH2D("LambdaPars", "Lambda Parameters by Pair Type", nParticleTypes, 0, nParticleTypes, nParticleTypes, 0, nParticleTypes);
-  bool isPartAntipart = true;
-  if(&eventParticles1 == &eventParticles2) isPartAntipart = false;
+  bool isPartAntipart = false;
+  TSting histName = "LambdaParams";
+  if(!isAntipart1) histName += "Particle";
+  else histName += "Antiparticle";
+  if(isAntipart1 != isAntipart2) {
+    histName += "Antiparticle";
+    isPartAntipart = true;
+  }
+  TH2D *hLambdaPars = new TH2D(histName, "Lambda Parameters by Pair Type", nParticleTypes, 0, nParticleTypes, nParticleTypes, 0, nParticleTypes);
 
   // Loop over each type of pairs, and set the lambda
   for(int iPart1 = 0; iPart1 < nParticleTypes; iPart1++){//First type of particle in pair
@@ -240,7 +255,7 @@ TH2D *GenerateLambdaParHisto(int nParticleTypes, const vector<TH1D*> &eventParti
     for(int iPart2 = iter2; iPart2 < nParticleTypes; iPart2++){
       double lambdaPar = -1.;
       double lambdaParError = 1.;
-      ComputeLambda(iPart1, iPart2, eventParticles, lambdaPar, lambdaParError);
+      ComputeLambda(iPart1, iPart2, eventParticles1, eventParticles2, lambdaPar, lambdaParError);
       hLambdaPars->SetBinContent(iPart1+1, iPart2+1, lambdaPar);
       hLambdaPars->SetBinError(iPart1+1, iPart2+1, lambdaParError);
       sumLambdaPars += lambdaPar;
@@ -413,13 +428,16 @@ double ComputeLambdaNonIdenticalError(const int part1, const int part2, const ve
 }
 
 
-TH1D *ComputeAverageYields(const vector<TH1D*> &eventParticles)
+TH1D *ComputeAverageYields(const vector<TH1D*> &eventParticles, bool isAntiparticle)
 {
   //Find the average yields and std deviation for each particle type
   //Current error bars show the error of the avg calculation, not the
   //std deviation of the yields
   int nEvents = eventParticles.size();
-  TH1D *hAvgYields = eventParticles[0]->Clone("AvgYields");
+  TString histName = "AvgYields";
+  if(isAntiparticle) histName += "Antiparticle";
+  else histName += "Particle";
+  TH1D *hAvgYields = eventParticles[0]->Clone(histName);
   TH1D *hAvgSquaredYields = eventParticles[0]->Clone("AvgSqrYields");
   hAvgSquaredYields->Multiply(eventParticles[0]);
   for(int iEv = 1; iEv < nEvents; iEv++){
