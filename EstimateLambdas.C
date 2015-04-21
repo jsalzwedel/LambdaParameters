@@ -61,13 +61,11 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
   vector<TH1D*> eventParticles1;
   vector<TH1D*> secondParticleCollection; //Only use this if we want to estimate particle-antiparticle lambda parameters
   vector<TH1D*> &eventParticles2 = eventParticles1;
-  bool isPartAntipartPairs = false;
   if(isAntipart1 != isAntipart2) {
-    &eventParticles2 = secondParticleCollection; //We do have separate particles and antiparticles
-    isPartAntipartPairs = true;
+    &eventParticles2 = secondParticleCollection; //We do have separate particles and antiparticles, so use a second collection
   }
 
-  GenerateEventParticleHistograms(inputFileNames, eventParticles1, eventParticles2, isAntiPart1, isPartAntipartPairs)
+  GenerateEventParticleHistograms(inputFileNames, eventParticles1, eventParticles2, isAntiPart1, isAntipart2)
 
   //Now that we have found all the strange particles, calculate lambda parameters for each pair type
   TH2D* hLambdaPars = GenerateLambdaParHisto(nParticleTypes, eventParticles1, eventParticles2);
@@ -96,7 +94,6 @@ void GenerateEventParticleHistograms(vector<TString> &inputFileNames, vector<TH1
   gInterpreter->AddIncludePath("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/include");
   gROOT->LoadMacro("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/src/ParticleCoor.cxx");
   
-  // ******************************** WIP *******************************
   bool isPartAntipartPairs = false;
   if(isAntipart1 != isAntipart2) isPartAntipartPairs = true;
 
