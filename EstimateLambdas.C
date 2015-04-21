@@ -22,7 +22,7 @@
 #include "TBranch.h"
 #include "TTree.h"
 
-bool debug = false;
+bool globalDebug = false;
 class ParticleCoor;
 
 //Was having a problem including a therminator file.
@@ -57,9 +57,9 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
   // Outputs and saves histograms of 
   // lambda parameters and average particle multiplicities
 
+  //Make vectors to hold particle yield histograms for each event
   vector<TH1D*> eventParticles1;
   vector<TH1D*> secondParticleCollection; //Only use this if we want to estimate particle-antiparticle lambda parameters
-  
   vector<TH1D*> &eventParticles2 = eventParticles1;
   bool isPartAntipartPairs = false;
   if(isAntipart1 != isAntipart2) {
@@ -67,7 +67,7 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
     isPartAntipartPairs = true;
   }
 
-  GenerateEventParticleVectors(inputFileNames, eventParticles1, eventParticles2, isAntiPart1, isPartAntipartPairs)
+  GenerateEventParticleHistograms(inputFileNames, eventParticles1, eventParticles2, isAntiPart1, isPartAntipartPairs)
 
   //Now that we have found all the strange particles, calculate lambda parameters for each pair type
   TH2D* hLambdaPars = GenerateLambdaParHisto(nParticleTypes, eventParticles1, eventParticles2);
@@ -90,20 +90,15 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
   
 }
 
-void GenerateEventParticleVectors(vector<TString> &inputFileNames, vector<TH1D*> &eventParticles1, vector<TH1D*> &eventParticles2, bool isAntipart1, bool isPartAntipartPairs)
+void GenerateEventParticleHistograms(vector<TString> &inputFileNames, vector<TH1D*> &eventParticles1, vector<TH1D*> &eventParticles2, bool isAntipart1, bool isAntipart2)
 {
   //Load this therminator class
   gInterpreter->AddIncludePath("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/include");
   gROOT->LoadMacro("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/src/ParticleCoor.cxx");
   
-  //Make a vector to hold a pair count histogram for each event
-
-  int eventCounter = -1;
-
-  
-
   // ******************************** WIP *******************************
-  
+  bool isPartAntipartPairs = false;
+  if(isAntipart1 != isAntipart2) isPartAntipartPairs = true;
 
 
   //Make a list of the PID codes for each particle we care about
@@ -124,11 +119,12 @@ void GenerateEventParticleVectors(vector<TString> &inputFileNames, vector<TH1D*>
   
   ParticleCoor *particleEntry = new ParticleCoor();
   int nFiles = inputFileNames.size();
+  int eventCounter = -1;
   for(int iFile = 0; iFile < nFiles; iFile++)
   {
 
     //If debugging, do calculations using a single event
-    if(debug) if(1 == eventCounter) break;
+    if(globalDebug) if(1 == eventCounter) break;
 
     //Read in the therminator event file and get the particle branch
     TFile thermTFile(inputFileNames[iFile], "READ");
@@ -140,7 +136,8 @@ void GenerateEventParticleVectors(vector<TString> &inputFileNames, vector<TH1D*>
 
     UInt_t eventID = 0; //This will be set to each event ID (they are not number 1, 2, ...)
 
-    TH1D *currentHist = NULL;
+    TH1D *currentHist1 = NULL;
+    TH1D *currentHist2 = NULL;
 
     //Loop over all the particles and find the lambdas
     int nThermEntries = thermTree->GetEntries();
@@ -149,52 +146,85 @@ void GenerateEventParticleVectors(vector<TString> &inputFileNames, vector<TH1D*>
       //Get the next particle
       int nBytesInEntry = thermTree->GetEntry(i);
       assert(nBytesInEntry>0);
-      if(3122==particleEntry->pid) //Is it a lambda? (primary or secondary are allowed here)
+
+      //Check if this entry is a (anti)lambda (primary or secondary)
+      int pid = particleEntry->pid;
+      if( (!isAntipart1 && 3122==pid) || 
+	  (isAntipart1 && -3122==pid) || 
+	  (isPartAntipartPairs && -3122==pid) )
       {
 	//Make sure the particle passes the reconstruction cuts
 	if(!CheckIfPassParticleCuts(particleEntry)) continue;
 	//Check if this is a new event.  If so, we'll need to make a new multiplicity histogram
-	if( (particleEntry->eventid != eventID) || !currentHist){ 
+	if( (particleEntry->eventid != eventID) || !currentHist1){ 
+
 	  //We have reached a new event (or the first event)
 	  eventID = particleEntry->eventid;
 	  eventCounter++;
 	  cout<<"Processing event \t"<<eventCounter<<"\tEvent ID: \t"<<particleEntry->eventid<<endl;
+
 	  //If debugging, do calculations using a single event
-	  if(debug) if(1 == eventCounter) break;
+	  if(globalDebug) if(1 == eventCounter) break;
 
 	  //Make a new particle histogram and add it to the vector
-	  TString histName = "hParticles";
+	  TString histName = "h";
+	  if(isAntiPart1) histName+= "Anti"
+	  histName += "Particles";
 	  histName += eventCounter;
-	  TH1D *hParticles = new TH1D(histName,"Particles Per Type", nParticleTypes, 0, nParticleTypes);
-	  hParticles->SetDirectory(0); //Disassociate it from the TFile
-	  hParticles->Sumw2();
-	  eventParticles.push_back(hParticles);
-
+	  TH1D *hParticles1 = new TH1D(histName,"Particles Per Type", nParticleTypes, 0, nParticleTypes);
+	  hParticles1->SetDirectory(0); //Disassociate it from the TFile
+	  hParticles1->Sumw2();
+	  eventParticles1.push_back(hParticles1);
 	  //Now use this histogram in future particle binning
-	  currentHist = hParticles;
+	  currentHist1 = hParticles1;
+
+	  //If we are doing particle antiparticle pairs, make a second
+	  //set of hists for holding antiparticle yields.
+	  if(isPartAntipartPairs) {
+	    TString histName2 = "hAntiParticles";
+	    histName2 += eventCounter;
+	    TH1D *hParticles2 = new TH1D(histName2,"Particles Per Type", nParticleTypes, 0, nParticleTypes);
+	    hParticles2->SetDirectory(0); //Disassociate it from the TFile
+	    hParticles2->Sumw2();
+	    eventParticles2.push_back(hParticles2);
+	    currentHist2 = hParticles2;
+	  }
 	}
 
 	//Check parent info
 	for(int iPar = 0; iPar < nParticleTypes; iPar++)
 	{
-	  if(particleEntry->fatherpid == strangePDGs[iPar]) {
-	    currentHist->Fill(iPar);
+	  int fpid = particleEntry->fatherpid;
+	  if( !isAntipart1 && fpid == strangePDGs[iPar] ) {
+	    currentHist1->Fill(iPar);
 	    break;
+	  }
+	  else if( isAntipart1 && fpid == (-1 * strangePDGs[iPar]) ) {
+	    currentHist1->Fill(iPar);
+	    break;
+	  }
+	  if(isPartAntipartPairs && fpid == (-1 * strangePDGs[iPar]) ) {
+	    currentHist2->Fill(ipar);
+	    break
 	  }
 
 	  // If we reach the end of the last loop iteration,
 	  // that means that the lambda parent isn't in
 	  // our short list of PDG codes.  It must be a 
 	  // short-lived resonance.  We'll just bin that
-	  // as a primary lambda.
-	  if(nParticleTypes-1 == iPar) currentHist->Fill(0); // Count all the resonances decays as primary lambdas
+	  // as a primary (anti)lambda.
+	  if(nParticleTypes-1 == iPar) 
+	  {
+	    if( !isAntipart1 && pid > 0 ) currentHist1->Fill(0);
+	    else if( isAntipart1 && pid < 0 ) currentHist1->Fill(0);
+	    else if( isPartAntipartPairs && pid < 0) currentHist2->Fill(0);
+	  }
 	}
       } // end is(lambda)?
     } // end loop over particle entries
   } // end loop over files
   cout<<"Finished looping over particles"<<endl;
   cout<<"Total events used:\t"<<eventCounter+1<<endl;
-
 }
 
 
