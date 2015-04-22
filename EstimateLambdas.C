@@ -82,6 +82,7 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
 
   TFile outFile(outfileName,"update");
   outFile.cd();
+  cout<<"Writing lambda histogram. Name:\t"<<hLambdaPars->GetName()<<endl;
   hLambdaPars->Write(0,TObject::kOverwrite);
  
   //Make, draw, and save a histo of average particle yields
@@ -306,9 +307,10 @@ void ComputeLambdaIdentical(const int part1, const int part2, const vector<TH1D*
 
   for(int iEv = 0; iEv < nEvents; iEv++){ 
     double nTotalYield = eventParticles1[iEv]->Integral();
-    cout<<"Total yield\t"<<nTotalYield<<endl;
+    cout<<"Event "<<iEv<<":\tTotal yield\t"<<nTotalYield<<endl;
     if(1 >= nTotalYield) continue;
     nEffectiveEvents++;
+    cout<<"Getting yield of particle 1"<<endl;
     double nPart1 = eventParticles1[iEv]->GetBinContent(part1+1);
     cout<<"Part1\t"<<nPart1<<endl;
     // Sum pairs for each event
@@ -317,20 +319,25 @@ void ComputeLambdaIdentical(const int part1, const int part2, const vector<TH1D*
 
     }
     else { //pairs of non-identical (parent) particles
+      cout<<"Getting yield of particle 2"<<endl;
       double nPart2 = eventParticles1[iEv]->GetBinContent(part2+1);
       nSpecPairs += nPart1*nPart2;
       cout<<"Part2\t"<<nPart2<<endl;
     }
-    int totalPart = eventParticles1[iEv]->Integral();
-    nTotalPairs += totalPart * (totalPart - 1)/2;
+    nTotalPairs += nTotalYield * (nTotalYield - 1)/2;
   } //end looping over events
     
   //Compute average pairs and average total pairs
+  cout<<"Calculating num"<<endl;
   double avgSpecPairs = (1.*nSpecPairs) / (1.*nEffectiveEvents);
+  cout<<"Calculating den"<<endl;
   double avgTotalPairs = (1.*nTotalPairs) / (1.*nEffectiveEvents);
 
   // Find lambda (ratio of avgSpec/avgTotal) and error
+  cout<<"Calculating lambda now"<<endl;
   lambda = avgSpecPairs/avgTotalPairs;
+  cout<<"Lambda is\t"<<lambda<<endl
+      <<"Now calculate identical error"<<endl;
   lambdaError = ComputeLambdaIdenticalError(part1, part2, eventParticles1, avgTotalPairs, lambda);
   return;
 }
@@ -383,39 +390,52 @@ void ComputeLambdaNonIdentical(const int part1, const int part2, const vector<TH
 double ComputeLambdaIdenticalError(const int part1, const int part2, const vector<TH1D*> &eventParticles, const double avgTotalPairs, const double lambda)
 {
   // Compute and return the mean error for a given lambda parameter
-  
+  cout<<"ComputeLambdaIdenticalError"<<endl;
   // Different formulae for identical particles vs non-identical particles
   // (See ComputeLambdaNonIdenticalError for particle-antiparticle error)
   double errSqr = 0.;
   double nEvents = eventParticles.size();
   int nEffectiveEvents = 0;
-
+  cout<<"Event size:\t"<<nEvents<<endl;
 
   // Sum in quadrature the error coming from each particle yield in each event
   // See lab notebook for details of error calculation
   if(part1 == part2){
     for(int iEv = 0; iEv < nEvents; iEv++){
+      cout<<"Event "<<iEv<<"\tP1==P2\n";
       double nTotalYield = eventParticles[iEv]->Integral();
+      cout<<"Total event yield\t"<<nTotalYield;
       if(1 >= nTotalYield) continue;
       nEffectiveEvents++;
 
       double p1Yield = eventParticles[iEv]->GetBinContent(part1+1);
+      cout<<"p1Yield\t"<<p1Yield<<endl;
       errSqr += pow(lambda,2) * nTotalYield * pow( (0.5 - nTotalYield) ,2);
+      cout<<"After mathing1"<<endl;
       errSqr += p1Yield * (p1Yield - 0.5) * (p1Yield - 0.5 + lambda * (0.5 - nTotalYield) );
+      cout<<"After mathing2"<<endl;
     }
   }
   else{
     for(int iEv = 0; iEv < nEvents; iEv++){
+      cout<<"Event "<<iEv<<"\tP1!=P2\n";
       double nTotalYield = eventParticles[iEv]->Integral();
+      cout<<"Total event yield\t"<<nTotalYield;
+      if(1 >= nTotalYield) continue;
+      nEffectiveEvents++;
       double p1Yield = eventParticles[iEv]->GetBinContent(part1+1);
       double p2Yield = eventParticles[iEv]->GetBinContent(part2+1);
+      cout<<"p1Yield\t"<<p1Yield<<"\n"
+	  <<"p2Yield\t"<<p2Yield<<"\n";
       errSqr += p1Yield * p2Yield * (p1Yield + p2Yield - 2*lambda * (nTotalYield - 0.5));
+      cout<<"After mathing1"<<endl;
       errSqr += pow(lambda,2) * nTotalYield * pow( (nTotalYield - 0.5), 2);
+      cout<<"After mathing2"<<endl;
     }
   }
   errSqr /= pow(nEffectiveEvents,2);
   errSqr /= pow(avgTotalPairs,2);
-
+  cout<<"ErrSqr = "<<errSqr<<endl;
   return sqrt(errSqr);
 }
 
