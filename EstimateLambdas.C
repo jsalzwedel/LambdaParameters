@@ -123,15 +123,15 @@ void GenerateEventParticleHistograms(int nParticleTypes, vector<TString> &inputF
   //so we don't need to include those PDG codes here.
 
   int strangePDGs[5] = {3122, //Lambda
-			 3212, //Sigma0
-			 // 3224, //Sigma*+
-			 // 3214, //Sigma*0
-			 // 3114, //Sigma*-
-			 3322, //Xi0
-			 3312, //Xi-
-			 // 3324, //Xi*0
-			 // 3314, //Xi*-
-			 3334}; //Omega-
+			3212, //Sigma0
+			// 3224, //Sigma*+
+			// 3214, //Sigma*0
+			// 3114, //Sigma*-
+			3322, //Xi0
+			3312, //Xi-
+			// 3324, //Xi*0
+			// 3314, //Xi*-
+			3334}; //Omega-
 
   
   ParticleCoor *particleEntry = new ParticleCoor();
@@ -236,7 +236,7 @@ void GenerateEventParticleHistograms(int nParticleTypes, vector<TString> &inputF
 	    else if( isAntipart1 && pid < 0 ) currentHist1->Fill(0);
 	    else if( isPartAntipartPairs && pid < 0) currentHist2->Fill(0);
 	  }
-	}
+	} // End loop over iPar
       } // end is(lambda)?
     } // end loop over particle entries
   } // end loop over files
@@ -309,7 +309,7 @@ void ComputeLambdaIdentical(const int part1, const int part2, const vector<TH1D*
     cout<<"Total yield\t"<<nTotalYield<<endl;
     if(1 >= nTotalYield) continue;
     nEffectiveEvents++;
-    int nPart1 = eventParticles1[iEv]->GetBinContent(part1+1);
+    double nPart1 = eventParticles1[iEv]->GetBinContent(part1+1);
     cout<<"Part1\t"<<nPart1<<endl;
     // Sum pairs for each event
     if(part1 == part2) { //pairs of identical (parent) particles
@@ -317,7 +317,7 @@ void ComputeLambdaIdentical(const int part1, const int part2, const vector<TH1D*
 
     }
     else { //pairs of non-identical (parent) particles
-      int nPart2 = eventParticles1[iEv]->GetBinContent(part2+1);
+      double nPart2 = eventParticles1[iEv]->GetBinContent(part2+1);
       nSpecPairs += nPart1*nPart2;
       cout<<"Part2\t"<<nPart2<<endl;
     }
@@ -337,10 +337,11 @@ void ComputeLambdaIdentical(const int part1, const int part2, const vector<TH1D*
 
 void ComputeLambdaNonIdentical(const int part1, const int part2, const vector<TH1D*> &eventParticles1, const vector<TH1D*> &eventParticles2, double &lambda, double &lambdaError)
 {
-  
   // For mix of particles-antiparticles.
   // Calculate lambda parameter for a given pair type via 
   // <N pairs>/<N total pairs>
+
+  cout<<"Computing lambda parameter for non-identical particles:\t"<<part1<<"\t"<<part2<<endl;
 
   int nSpecPairs = 0;
   int nTotalPairs = 0;
@@ -358,10 +359,12 @@ void ComputeLambdaNonIdentical(const int part1, const int part2, const vector<TH
     if(0 == nTotalParticles) continue;
     if(0 == nTotalAntiParticles) continue;
     nEffectiveEvents++;
-    const int nPart1 = eventParticles1[iEv]->GetBinContent(part1+1);
-    const int nPart2 = eventParticles2[iEv]->GetBinContent(part2+1);
-    cout<<"Part1\t"<<nPart1<<endl;
-    cout<<"Part2\t"<<nPart2<<endl;
+    const double nPart1 = eventParticles1[iEv]->GetBinContent(part1+1);
+    const double nPart2 = eventParticles2[iEv]->GetBinContent(part2+1);
+    cout<<"const Part1\t"<<nPart1<<endl;
+    cout<<"const Part2\t"<<nPart2<<endl;
+    cout<<"non-const Part1\t"<<eventParticles1[iEv]->GetBinContent(part1+1)<<endl;
+    cout<<"non-const Part2\t"<<eventParticles2[iEv]->GetBinContent(part2+1)<<endl;
     nSpecPairs += nPart1*nPart2;
     nTotalPairs += nTotalParticles * nTotalAntiParticles;
   } //end looping over events
