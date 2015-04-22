@@ -29,10 +29,11 @@ class ParticleCoor;
 //This fixes it.
 #define _CXX_VER_ "g++(4.9.1)" 
 
-void EstimateLambdas(int nFiles=2)
+void EstimateLambdas(bool isAntipart1, bool isAntipart2, int nFiles=2)
 {
   // Main function. Generates list of file names
   // and pass them to RunSimpleLambdaEstimate
+  if(isAntipart1 && !isAntipart2) {cout<<"Bad input particle types\n"; return;}
   TString filePath = "/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/events/lhyquid3v-LHCPbPb2760b2.3Ti512t0.60Tf140a0.08b0.08h0.24x2.3v2/";
   vector<TString> inputFileNames;
 
@@ -48,7 +49,7 @@ void EstimateLambdas(int nFiles=2)
     cout<<fileName<<endl;
     inputFileNames.push_back(fileName);
   }
-  RunSimpleLambdaEstimate(inputFileNames);
+  RunSimpleLambdaEstimate(inputFileNames, isAntipart1, isAntipart2);
 }
 
 
@@ -64,41 +65,51 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
   if(isAntipart1 != isAntipart2) {
     &eventParticles2 = secondParticleCollection; //We do have separate particles and antiparticles, so use a second collection
   }
-
-  GenerateEventParticleHistograms(inputFileNames, eventParticles1, eventParticles2, isAntiPart1, isAntipart2)
+  int nParticleTypes = 5;
+  GenerateEventParticleHistograms(nParticleTypes, inputFileNames, eventParticles1, eventParticles2, isAntipart1, isAntipart2);
 
   //Now that we have found all the strange particles, calculate lambda parameters for each pair type
-  TH2D* hLambdaPars = GenerateLambdaParHisto(nParticleTypes, eventParticles1, eventParticles2);
+  TH2D* hLambdaPars = GenerateLambdaParHisto(nParticleTypes, eventParticles1, eventParticles2, isAntipart1, isAntipart2);
   SetLambdaHistAxisLabels(hLambdaPars->GetXaxis(),isAntipart1);
   SetLambdaHistAxisLabels(hLambdaPars->GetYaxis(),isAntipart2);
 
   //Draw and save the lambda par histo
-  hLambdaPars->DrawCopy("colzTEXTe");
+  // TCanvas *c1 = new TCanvas("LambdaPars","Lambda Parameters");
+  // hLambdaPars->DrawCopy("colzTEXTe");
+
+  // cout<<"Debug:: All Finished"<<endl;
   TString outfileName = "LambdaPars.root";
 
   TFile outFile(outfileName,"update");
   outFile.cd();
-  hLambdaPars->Write(kOverwrite);
+  hLambdaPars->Write(0,TObject::kOverwrite);
  
   //Make, draw, and save a histo of average particle yields
   TH1D *hAvgYields = ComputeAverageYields(eventParticles1,isAntipart1);
   SetLambdaHistAxisLabels(hAvgYields->GetXaxis(),isAntipart1);
-  hAvgYields->Write(kOverwrite);
-  TCanvas *c2 = new TCanvas("yields","Avg Yields");
-  hAvgYields->DrawCopy("ptexte");
+  cout<<"Writing AvgYield1"<<endl;
+  hAvgYields->Write(0,TObject::kOverwrite);
+  // TCanvas *c2 = new TCanvas("yields","Avg Yields");
+  // cout<<"Drawing AvgYield1"<<endl;
+  // hAvgYields->DrawCopy("ptexte");
 
-  if(isAntiPart1 != isAntipart2) {
-    TH1D *hAvgYieldsAnti = ComputeAverageYields(eventParticles1,isAntipart2);
+  if(isAntipart1 != isAntipart2) {
+    TH1D *hAvgYieldsAnti = ComputeAverageYields(eventParticles2,isAntipart2);
     SetLambdaHistAxisLabels(hAvgYieldsAnti->GetXaxis(),isAntipart2);
-    hAvgYieldsAnti->Write(kOverwrite);
-    TCanvas *c3 = new TCanvas("yieldsAnti","Avg Yields Antiparticles");
-    hAvgYieldsAnti->DrawCopy("ptexte");
+    cout<<"Writing AvgYield2"<<endl;
+    hAvgYieldsAnti->Write(0,TObject::kOverwrite);
+    // TCanvas *c3 = new TCanvas("yieldsAnti","Avg Yields Antiparticles");
+    // cout<<"Drawing AvgYield2"<<endl;
+    // hAvgYieldsAnti->DrawCopy("ptexte");
   }
-  
+  cout<<"All finished!"<<endl;
 }
 
-void GenerateEventParticleHistograms(vector<TString> &inputFileNames, vector<TH1D*> &eventParticles1, vector<TH1D*> &eventParticles2, bool isAntipart1, bool isAntipart2)
+void GenerateEventParticleHistograms(int nParticleTypes, vector<TString> &inputFileNames, vector<TH1D*> &eventParticles1, vector<TH1D*> &eventParticles2, bool isAntipart1, bool isAntipart2)
 {
+
+  cout<<"Starting particle collection"<<endl;
+
   //Load this therminator class
   gInterpreter->AddIncludePath("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/include");
   gROOT->LoadMacro("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/src/ParticleCoor.cxx");
@@ -110,7 +121,7 @@ void GenerateEventParticleHistograms(vector<TString> &inputFileNames, vector<TH1
   //Make a list of the PID codes for each particle we care about
   //We will treat all resonance -> lambda decays as primary lambdas,
   //so we don't need to include those PDG codes here.
-  int nParticleTypes = 5;
+
   int strangePDGs[5] = {3122, //Lambda
 			 3212, //Sigma0
 			 // 3224, //Sigma*+
@@ -174,7 +185,7 @@ void GenerateEventParticleHistograms(vector<TString> &inputFileNames, vector<TH1
 
 	  //Make a new particle histogram and add it to the vector
 	  TString histName = "h";
-	  if(isAntiPart1) histName+= "Anti"
+	  if(isAntipart1) histName += "Anti";
 	  histName += "Particles";
 	  histName += eventCounter;
 	  TH1D *hParticles1 = new TH1D(histName,"Particles Per Type", nParticleTypes, 0, nParticleTypes);
@@ -210,8 +221,8 @@ void GenerateEventParticleHistograms(vector<TString> &inputFileNames, vector<TH1
 	    break;
 	  }
 	  if(isPartAntipartPairs && fpid == (-1 * strangePDGs[iPar]) ) {
-	    currentHist2->Fill(ipar);
-	    break
+	    currentHist2->Fill(iPar);
+	    break;
 	  }
 
 	  // If we reach the end of the last loop iteration,
@@ -229,17 +240,18 @@ void GenerateEventParticleHistograms(vector<TString> &inputFileNames, vector<TH1
       } // end is(lambda)?
     } // end loop over particle entries
   } // end loop over files
-  cout<<"Finished looping over particles"<<endl;
+  cout<<"Finished particle collection"<<endl;
   cout<<"Total events used:\t"<<eventCounter+1<<endl;
 }
 
 
 TH2D *GenerateLambdaParHisto(int nParticleTypes, const vector<TH1D*> &eventParticles1, const vector<TH1D*> &eventParticles2, const bool isAntipart1, const bool isAntipart2){
+  cout<<"Generating lambda parameter histograms."<<endl;
   // Make a histogram containing lambda parameters for each
   // pair type
   double sumLambdaPars = 0.;
   bool isPartAntipart = false;
-  TSting histName = "LambdaParams";
+  TString histName = "LambdaParams";
   if(!isAntipart1) histName += "Particle";
   else histName += "Antiparticle";
   if(isAntipart1 != isAntipart2) {
@@ -247,7 +259,10 @@ TH2D *GenerateLambdaParHisto(int nParticleTypes, const vector<TH1D*> &eventParti
     isPartAntipart = true;
   }
   TH2D *hLambdaPars = new TH2D(histName, "Lambda Parameters by Pair Type", nParticleTypes, 0, nParticleTypes, nParticleTypes, 0, nParticleTypes);
+  hLambdaPars->SetDirectory(0);
 
+  cout<<"Calculating lambda parameters"<<endl;
+  // cout<<"Part1\tPart2\tlambda\terror\n";
   // Loop over each type of pairs, and set the lambda
   for(int iPart1 = 0; iPart1 < nParticleTypes; iPart1++){//First type of particle in pair
     int iter2 = iPart1;
@@ -259,10 +274,12 @@ TH2D *GenerateLambdaParHisto(int nParticleTypes, const vector<TH1D*> &eventParti
       hLambdaPars->SetBinContent(iPart1+1, iPart2+1, lambdaPar);
       hLambdaPars->SetBinError(iPart1+1, iPart2+1, lambdaParError);
       sumLambdaPars += lambdaPar;
+      // cout<<iPart1<<"\t"<<iPart2<<"\t"<<lambdaPar<<"\t"<<lambdaParError<<"\n"<<endl;      
     }
   }
   //The sum of lambda pars should add up to unity.
   cout<<"Sum of lambda pars:\t"<<sumLambdaPars<<endl;
+  cout<<"Finished generating lambda parameter histograms."<<endl;
   return hLambdaPars;
 }
 
@@ -271,7 +288,7 @@ void ComputeLambda(const int part1, const int part2, const vector<TH1D*> &eventP
   //Determine whether we are computing lambda for particle-particle (anti-anti) or particle-antiparticle, then calculate the corresponding lambda parameter and lambda error bars.
   bool identical = false;
   if(&eventParticles1 == &eventParticles2) ComputeLambdaIdentical(part1, part2, eventParticles1, lambda, lambdaError);
-  else ComputeLambdaNonIdentical(part1, part2, eventParticles1, eventParticles2, lambda, lambdaError)
+  else ComputeLambdaNonIdentical(part1, part2, eventParticles1, eventParticles2, lambda, lambdaError);
 }
 
  
@@ -289,18 +306,20 @@ void ComputeLambdaIdentical(const int part1, const int part2, const vector<TH1D*
 
   for(int iEv = 0; iEv < nEvents; iEv++){ 
     double nTotalYield = eventParticles1[iEv]->Integral();
+    cout<<"Total yield\t"<<nTotalYield<<endl;
     if(1 >= nTotalYield) continue;
     nEffectiveEvents++;
-
+    int nPart1 = eventParticles1[iEv]->GetBinContent(part1+1);
+    cout<<"Part1\t"<<nPart1<<endl;
     // Sum pairs for each event
     if(part1 == part2) { //pairs of identical (parent) particles
-      int nPart1 = eventParticles1[iEv]->GetBinContent(part1+1);
       nSpecPairs += nPart1*(nPart1 - 1)/2;
+
     }
     else { //pairs of non-identical (parent) particles
-      int nPart1 = eventParticles1[iEv]->GetBinContent(part1+1);
       int nPart2 = eventParticles1[iEv]->GetBinContent(part2+1);
       nSpecPairs += nPart1*nPart2;
+      cout<<"Part2\t"<<nPart2<<endl;
     }
     int totalPart = eventParticles1[iEv]->Integral();
     nTotalPairs += totalPart * (totalPart - 1)/2;
@@ -333,12 +352,16 @@ void ComputeLambdaNonIdentical(const int part1, const int part2, const vector<TH
 
     // Ignore events where you have no particles or no antiparticles
     const double nTotalParticles = eventParticles1[iEv]->Integral();
-    const double nTotalAntiParticles = eventParticles2[iEv]->Integral()
+    const double nTotalAntiParticles = eventParticles2[iEv]->Integral();
+    cout<<"nTotalParticles:\t"<<nTotalParticles<<endl;
+    cout<<"nTotalAntiParticles:\t"<<nTotalAntiParticles<<endl;
     if(0 == nTotalParticles) continue;
     if(0 == nTotalAntiParticles) continue;
     nEffectiveEvents++;
     const int nPart1 = eventParticles1[iEv]->GetBinContent(part1+1);
     const int nPart2 = eventParticles2[iEv]->GetBinContent(part2+1);
+    cout<<"Part1\t"<<nPart1<<endl;
+    cout<<"Part2\t"<<nPart2<<endl;
     nSpecPairs += nPart1*nPart2;
     nTotalPairs += nTotalParticles * nTotalAntiParticles;
   } //end looping over events
@@ -346,6 +369,7 @@ void ComputeLambdaNonIdentical(const int part1, const int part2, const vector<TH
   //Compute average pairs and average total pairs
   double avgSpecPairs = (1.*nSpecPairs) / (1.*nEffectiveEvents);
   double avgTotalPairs = (1.*nTotalPairs) / (1.*nEffectiveEvents);
+  cout<<"AvgSpecPairs:\t"<<avgSpecPairs<<",\tAvgTotalPairs"<<avgTotalPairs<<endl;
 
   // Find lambda (ratio of avgSpec/avgTotal) and error
   lambda = avgSpecPairs/avgTotalPairs;
@@ -383,7 +407,7 @@ double ComputeLambdaIdenticalError(const int part1, const int part2, const vecto
       double p1Yield = eventParticles[iEv]->GetBinContent(part1+1);
       double p2Yield = eventParticles[iEv]->GetBinContent(part2+1);
       errSqr += p1Yield * p2Yield * (p1Yield + p2Yield - 2*lambda * (nTotalYield - 0.5));
-      errSqr += pow(lambda,2) * nTotalYield * pow( (nTotalYield - 0.5), 2)
+      errSqr += pow(lambda,2) * nTotalYield * pow( (nTotalYield - 0.5), 2);
     }
   }
   errSqr /= pow(nEffectiveEvents,2);
@@ -433,6 +457,7 @@ TH1D *ComputeAverageYields(const vector<TH1D*> &eventParticles, bool isAntiparti
   //Find the average yields and std deviation for each particle type
   //Current error bars show the error of the avg calculation, not the
   //std deviation of the yields
+  cout<<"Generating average yield histogram"<<endl;
   int nEvents = eventParticles.size();
   TString histName = "AvgYields";
   if(isAntiparticle) histName += "Antiparticle";
@@ -468,6 +493,7 @@ TH1D *ComputeAverageYields(const vector<TH1D*> &eventParticles, bool isAntiparti
     hAvgYields->SetBinError(iBin,rootVal);
   }
   
+  cout<<"Finished generating average yield histogram"<<endl;
   delete hAvgSquaredYields;
   delete hAvgYieldsSquared;
   return hAvgYields;
