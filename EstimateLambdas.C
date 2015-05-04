@@ -172,7 +172,7 @@ void GenerateEventParticleHistograms(int nParticleTypes, vector<TString> &inputF
 	  (isPartAntipartPairs && -3122==pid) )
       {
 	//Make sure the particle passes the reconstruction cuts
-	if(!CheckIfPassParticleCuts(particleEntry)) continue;
+	if(!CheckIfPassLambdaCuts(particleEntry)) continue;
 	//Check if this is a new event.  If so, we'll need to make a new multiplicity histogram
 	if( (particleEntry->eventid != eventID) || !currentHist1){ 
 
@@ -525,7 +525,7 @@ TH1D *ComputeAverageYields(const vector<TH1D*> &eventParticles, bool isAntiparti
   return hAvgYields;
 }
 
-bool CheckIfPassParticleCuts(ParticleCoor *particle)
+bool CheckIfPassLambdaCuts(ParticleCoor *particle)
 {
   //Implement all sorts of reconstruction/detection cuts here
   double etaCut = 0.8;
