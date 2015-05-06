@@ -54,6 +54,10 @@ void EstimateLambdas(bool isAntipart1, bool isAntipart2, int nFiles=2)
     cout<<fileName<<endl;
     inputFileNames.push_back(fileName);
   }
+
+  // Load in the necessary therminator particle class
+  gInterpreter->AddIncludePath("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/include");
+  gROOT->LoadMacro("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/src/ParticleCoor.cxx");
   RunSimpleLambdaEstimate(inputFileNames, isAntipart1, isAntipart2);
 }
 
@@ -131,8 +135,6 @@ void UseDaughtersToFindParents(const TTree *thermTree, int &nextEntry, const Pai
   if( (thisPairType == 1) || (thisPairType == 3) ) wantLams == true;
   if( (thisPairType == 2) || (thisPairType == 3) ) wantALams == true;
 
-  gInterpreter->AddIncludePath("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/include");
-  gROOT->LoadMacro("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/src/ParticleCoor.cxx");
   ParticleCoor *particleEntry = new ParticleCoor();
   TBranch *thermBranch = thermTree->GetBranch("particle");
   thermBranch->SetAddress(particleEntry);
@@ -227,31 +229,8 @@ void GenerateYieldHistograms(const int nParticleTypes, vector<TString> &inputFil
   gInterpreter->AddIncludePath("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/include");
   gROOT->LoadMacro("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/src/ParticleCoor.cxx");
 
-  int strangePDGs[5] = {3122, //Lambda
-			3212, //Sigma0
-			// 3224, //Sigma*+
-			// 3214, //Sigma*0
-			// 3114, //Sigma*-
-			3322, //Xi0
-			3312, //Xi-
-			// 3324, //Xi*0
-			// 3314, //Xi*-
-			3334}; //Omega-
-
-
-  //...
-
-  // bool wantLams = false;
-  // bool wantALams = false;
-  // if( (pairType == 1) || (pairType == 3) ) wantLams == true;
-  // if( (pairType == 2) || (pairType == 3) ) wantALams == true;
-
-
-
   int iEntry = 0;
   int eventCounter = 0;
-  //...
-  // while (iEntry < thermTree->GetEntries()) {
 
   // Loop over each file in the collection
   for(int iFile = 0; iFile < inputFileNames.size(); iFile++)
@@ -299,6 +278,18 @@ void GenerateYieldHistograms(const int nParticleTypes, vector<TString> &inputFil
 
 TH1D *FillLambdaYieldHist(const TTree *thermTree, const vector<int> &v0IDs, const int eventCounter, const Particle part, const int nParticleTypes)
 {
+
+  int strangePDGs[5] = {3122, //Lambda
+			3212, //Sigma0
+			// 3224, //Sigma*+
+			// 3214, //Sigma*0
+			// 3114, //Sigma*-
+			3322, //Xi0
+			3312, //Xi-
+			// 3324, //Xi*0
+			// 3314, //Xi*-
+			3334}; //Omega-
+
   // Build hist name
 
   // Intialize histogram
