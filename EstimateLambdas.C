@@ -111,7 +111,7 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
   cout<<"All finished!"<<endl;
 }
 
-void UseDaughtersToFindParents(const TTree *thermTree, const int firstEntry, const PairType thisPairType, int &nextEntry, vector<int> &lambdaIDs, vector<int> &antiLambdaIDs)
+void UseDaughtersToFindParents(const TTree *thermTree, int &nextEntry, const PairType thisPairType, const int finalEntry, vector<int> &lambdaIDs, vector<int> &antiLambdaIDs)
 {
   // Returns the particle IDs of all lambdas whose daughters
   // have been found.
@@ -131,18 +131,21 @@ void UseDaughtersToFindParents(const TTree *thermTree, const int firstEntry, con
   if( (thisPairType == 1) || (thisPairType == 3) ) wantLams == true;
   if( (thisPairType == 2) || (thisPairType == 3) ) wantALams == true;
 
+  gInterpreter->AddIncludePath("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/include");
+  gROOT->LoadMacro("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/src/ParticleCoor.cxx");
   ParticleCoor *particleEntry = new ParticleCoor();
   TBranch *thermBranch = thermTree->GetBranch("particle");
   thermBranch->SetAddress(particleEntry);
 
   //Get first particle in this event
-  thermTree->GetEntry(firstEntry);
-  int eventID = particleEntry->eventid;
-  int iPart = firstEntry;
+  thermTree->GetEntry(nextEntry);
+  int currentEventID = particleEntry->eventid;
+  cout<<"Event ID\t"<<currentEventID<<endl;
+  int iPart = nextEntry;
 
   //////////////////
   // Loop over particles.  Stop when we reach a new event
-  while(eventID == particleEntry->eventID)
+  while(particleEntry->eventID == currentEventID)
   {
     int pid = particleEntry->pid;
     int parentPid = particleEntry->fatherpid;
@@ -171,8 +174,9 @@ void UseDaughtersToFindParents(const TTree *thermTree, const int firstEntry, con
     }
 
     iPart++;
+    if(iPart == finalEntry) break;
     thermTree->GetEntry(iPart);
-  }
+  } //end while loop
 
   ///////////////
   // Check for (anti)lambdas in both daughter lists
@@ -200,6 +204,11 @@ void UseDaughtersToFindParents(const TTree *thermTree, const int firstEntry, con
     }
   }
 
+  //Make sure we didnt collect any of the wrong particle type
+  if(!wantLams) assert(lambdaIDs.size() == 0);
+  if(!wantALams) assert(antiLambdaIDs.size() == 0);
+
+
   //Set nextEntry to the particle ID of the first particle in the 
   //next event
   nextEntry = iPart;
@@ -209,48 +218,102 @@ void UseDaughtersToFindParents(const TTree *thermTree, const int firstEntry, con
 }
 
 
-void GenHistos2(/* ... */)
+void GenerateYieldHistograms(const int nParticleTypes, vector<TString> &inputFileNames, vector<TH1D*> &eventParticles1, vector<TH1D*> &eventParticles2, const PairType pairType)
 {
   
+  cout<<"Starting particle collection"<<endl;
+
+  //Load the ParticleCoor therminator class
+  gInterpreter->AddIncludePath("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/include");
+  gROOT->LoadMacro("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/src/ParticleCoor.cxx");
+
+  int strangePDGs[5] = {3122, //Lambda
+			3212, //Sigma0
+			// 3224, //Sigma*+
+			// 3214, //Sigma*0
+			// 3114, //Sigma*-
+			3322, //Xi0
+			3312, //Xi-
+			// 3324, //Xi*0
+			// 3314, //Xi*-
+			3334}; //Omega-
+
+
   //...
 
-  int firstEventEntry = -1;
-  int nextEventFirstEntry = -1;
+  // bool wantLams = false;
+  // bool wantALams = false;
+  // if( (pairType == 1) || (pairType == 3) ) wantLams == true;
+  // if( (pairType == 2) || (pairType == 3) ) wantALams == true;
+
+
 
   int iEntry = 0;
+  int eventCounter = 0;
   //...
-  while (iEntry < thermTree->GetEntries()) {
-    
-    firstEventEntry = nextEventFirstEntry;
-    vector<int> lambdaIDs;
-    vector<int> antiLambdaIDs;
-    UseDaughtersToFindParents(thermTree, firstEventEntry, thisPairType, nextEventFirstEntry, lambdaIDs, antiLambdaIDs);
-    
-    //Only push back histogram vectors if we found V0s.
-    if(!(lamddaIDs.size() == 0)) {}
-    if(!(antiLamddaIDs.size() == 0)) {}
-    
+  // while (iEntry < thermTree->GetEntries()) {
 
-    if(wantLams) {
-      for(int iLam = 0; iLam < lambdaIDs->size(); iLam++){
-	int v0ID = lambdaIDs[iLam];
-	
-	thermTree->GetEntry(v0ID);
-	//do stuff with this, like in GenerateEvent...
-	//assert(pdg == kLam)
-	
+  // Loop over each file in the collection
+  for(int iFile = 0; iFile < inputFileNames.size(); iFile++)
+  {
+    // Read in the therminator event file and get the particle branch
+    TFile thermTFile(inputFileNames[iFile], "READ");
+    assert(NULL!=&thermTFile);
+    TTree *thermTree = (TTree*)thermTFile.Get("particles");
+    assert(NULL!=thermTree);
+
+
+    int nextEventFirstEntry = 0;
+
+    int nThermEntries = thermTree->GetEntries();
+
+
+    while(nextEventFirstEntry < nThermEntries) {
+      // For each event, find the daughters and use them to find the parents
+      eventCounter++;
+      cout<<"Processing event \t"<<eventCounter<<endl;
+      vector<int> lambdaIDs;
+      vector<int> antiLambdaIDs;
+      UseDaughtersToFindParents(thermTree, nextEventFirstEntry, pairType, lambdaIDs, antiLambdaIDs);
+    
+      //Only push back histogram vectors if we find V0s.
+      if(!(lamddaIDs.size() == 0)) {
+	TH1D *lambdaYields = FillLambdaYieldHist(thermTree,lambdaIDs,eventCounter,kLam, nParticleTypes);
+	if(lambdaYields && lambdaYields->GetEntries > 0) {
+	  eventParticles1.push_back(lambdaYields);
+	}
       }
-    }
-    if(wantALams) {
+      if(!(antiLamddaIDs.size() == 0)) {
+	TH1D *antiLambdaYields = FillLambdaYieldHist(thermTree,antiLambdaIDs,eventCounter,kALam,nParticleTypes);
+	if(antiLambdaYields && antiLambdaYields->GetEntries > 0) {
+	  eventParticles2.push_back(antiLambdaYields);
+	}
+      }
+      
+    } // end event (while) loop
+  } // end file loop
 
-    }
-    
-
-  }
+  cout<<"Finished particle collection"<<endl;
+  cout<<"Total events used:\t"<<eventCounter<<endl;
 }
 
+TH1D *FillLambdaYieldHist(const TTree *thermTree, const vector<int> &v0IDs, const int eventCounter, const Particle part, const int nParticleTypes)
+{
+  // Build hist name
 
+  // Intialize histogram
 
+  // Loop over each v0ID, check if particle passes cuts, and fill histo appropriately
+     // for(int iLam = 0; iLam < lambdaIDs->size(); iLam++){
+     // 	int v0ID = lambdaIDs[iLam];
+	
+     // 	thermTree->GetEntry(v0ID);
+     // 	//do stuff with this, like in GenerateEvent...
+     // 	//assert(pdg == kLam)
+	
+     //  }
+
+}
 
 void GenerateEventParticleHistograms(int nParticleTypes, vector<TString> &inputFileNames, vector<TH1D*> &eventParticles1, vector<TH1D*> &eventParticles2, bool isAntipart1, bool isAntipart2)
 {
