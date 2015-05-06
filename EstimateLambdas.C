@@ -34,11 +34,16 @@ enum Particle {kProt = 2212, kAntiProt = -2212,
 	       kLam = 3122, kAntiLam = -3122};
 enum PairType {kLamLam, kALamALam, kLamALam};
 
-void EstimateLambdas(bool isAntipart1, bool isAntipart2, int nFiles=2)
+// void EstimateLambdas(bool isAntipart1, bool isAntipart2, int nFiles=2)
+void EstimateLambdas(const PairType pairType, int nFiles=2)
 {
   // Main function. Generates list of file names
   // and pass them to RunSimpleLambdaEstimate
-  if(isAntipart1 && !isAntipart2) {cout<<"Bad input particle types\n"; return;}
+  // if(isAntipart1 && !isAntipart2) {cout<<"Bad input particle types\n"; return;}
+  if( (pairType < kLamLam) || (pairType > kLamALam) ) {
+    cout<<"Bad input pair type\n";
+    return;
+  }
   TString filePath = "/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/events/lhyquid3v-LHCPbPb2760b2.3Ti512t0.60Tf140a0.08b0.08h0.24x2.3v2/";
   vector<TString> inputFileNames;
 
@@ -58,11 +63,11 @@ void EstimateLambdas(bool isAntipart1, bool isAntipart2, int nFiles=2)
   // Load in the necessary therminator particle class
   gInterpreter->AddIncludePath("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/include");
   gROOT->LoadMacro("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/src/ParticleCoor.cxx");
-  RunSimpleLambdaEstimate(inputFileNames, isAntipart1, isAntipart2);
+  RunSimpleLambdaEstimate(inputFileNames, pairType);
 }
 
 
-void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<TString> inputFileNames, const bool isAntipart1, const bool isAntipart2)
+void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<TString> inputFileNames, const PairType pairType)
 {
   // Outputs and saves histograms of 
   // lambda parameters and average particle multiplicities
@@ -71,11 +76,11 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
   vector<TH1D*> eventParticles1;
   vector<TH1D*> secondParticleCollection; //Only use this if we want to estimate particle-antiparticle lambda parameters
   vector<TH1D*> &eventParticles2 = eventParticles1;
-  if(isAntipart1 != isAntipart2) {
+  if(pairType == kLamALam) {
     &eventParticles2 = secondParticleCollection; //We do have separate particles and antiparticles, so use a second collection
   }
   int nParticleTypes = 5;
-  GenerateEventParticleHistograms(nParticleTypes, inputFileNames, eventParticles1, eventParticles2, isAntipart1, isAntipart2);
+  GenerateYieldHistograms(nParticleTypes, inputFileNames, eventParticles1, eventParticles2, pairType);
 
   //Now that we have found all the strange particles, calculate lambda parameters for each pair type
   TH2D* hLambdaPars = GenerateLambdaParHisto(nParticleTypes, eventParticles1, eventParticles2, isAntipart1, isAntipart2);
@@ -227,9 +232,9 @@ void GenerateYieldHistograms(const int nParticleTypes, vector<TString> &inputFil
   
   cout<<"Starting particle collection"<<endl;
 
-  //Load the ParticleCoor therminator class
-  gInterpreter->AddIncludePath("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/include");
-  gROOT->LoadMacro("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/src/ParticleCoor.cxx");
+  // //Load the ParticleCoor therminator class
+  // gInterpreter->AddIncludePath("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/include");
+  // gROOT->LoadMacro("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/src/ParticleCoor.cxx");
 
   int iEntry = 0;
   int eventCounter = 0;
@@ -267,7 +272,10 @@ void GenerateYieldHistograms(const int nParticleTypes, vector<TString> &inputFil
       if(!(antiLamddaIDs.size() == 0)) {
 	TH1D *antiLambdaYields = FillLambdaYieldHist(thermTree,antiLambdaIDs,eventCounter,kALam,nParticleTypes);
 	if(antiLambdaYields && antiLambdaYields->GetEntries > 0) {
-	  eventParticles2.push_back(antiLambdaYields);
+	  if(pairType == kLamALam) {
+	    eventParticles2.push_back(antiLambdaYields);
+	  }
+	  else eventParticles1.push_back(antiLambdaYields);
 	}
       }
       
