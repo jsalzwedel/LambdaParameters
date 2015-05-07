@@ -34,12 +34,10 @@ enum Particle {kProt = 2212, kAntiProt = -2212,
 	       kLam = 3122, kAntiLam = -3122};
 enum PairType {kLamLam, kALamALam, kLamALam};
 
-// void EstimateLambdas(bool isAntipart1, bool isAntipart2, int nFiles=2)
 void EstimateLambdas(const PairType pairType, int nFiles=2)
 {
   // Main function. Generates list of file names
   // and pass them to RunSimpleLambdaEstimate
-  // if(isAntipart1 && !isAntipart2) {cout<<"Bad input particle types\n"; return;}
   if( (pairType < kLamLam) || (pairType > kLamALam) ) {
     cout<<"Bad input pair type\n";
     return;
@@ -83,9 +81,19 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
   GenerateYieldHistograms(nParticleTypes, inputFileNames, eventParticles1, eventParticles2, pairType);
 
   //Now that we have found all the strange particles, calculate lambda parameters for each pair type
-  TH2D* hLambdaPars = GenerateLambdaParHisto(nParticleTypes, eventParticles1, eventParticles2, isAntipart1, isAntipart2);
-  SetLambdaHistAxisLabels(hLambdaPars->GetXaxis(),isAntipart1);
-  SetLambdaHistAxisLabels(hLambdaPars->GetYaxis(),isAntipart2);
+  TH2D* hLambdaPars = GenerateLambdaParHisto(nParticleTypes, eventParticles1, eventParticles2, pairType);
+  if(pairType == kLamLam) {
+    SetLambdaHistAxisLabels(hLambdaPars->GetXaxis(),kLam);
+    SetLambdaHistAxisLabels(hLambdaPars->GetYaxis(),kLam);
+  }
+  else if(pairType == kALamALam) {
+    SetLambdaHistAxisLabels(hLambdaPars->GetXaxis(),kALam);
+    SetLambdaHistAxisLabels(hLambdaPars->GetYaxis(),kALam);
+  }
+  else {
+    SetLambdaHistAxisLabels(hLambdaPars->GetXaxis(),kLam);
+    SetLambdaHistAxisLabels(hLambdaPars->GetYaxis(),AkLam);
+  }
 
   //Draw and save the lambda par histo
   // TCanvas *c1 = new TCanvas("LambdaPars","Lambda Parameters");
@@ -100,22 +108,23 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
   hLambdaPars->Write(0,TObject::kOverwrite);
  
   //Make, draw, and save a histo of average particle yields
-  TH1D *hAvgYields = ComputeAverageYields(eventParticles1,isAntipart1);
-  SetLambdaHistAxisLabels(hAvgYields->GetXaxis(),isAntipart1);
+  TH1D *hAvgYields = NULL;
+  if( (pairType == kLamLam) || (pairType == kLamALam) ) {
+    hAvgYields = ComputeAverageYields(eventParticles1,kLam);
+    SetLambdaHistAxisLabels(hAvgYields->GetXaxis(),kLam);
+  }
+  else {
+    hAvgYields = ComputeAverageYields(eventParticles1,kALam);
+    SetLambdaHistAxisLabels(hAvgYields->GetXaxis(),kALam);
+  }
   cout<<"Writing AvgYield1"<<endl;
   hAvgYields->Write(0,TObject::kOverwrite);
-  // TCanvas *c2 = new TCanvas("yields","Avg Yields");
-  // cout<<"Drawing AvgYield1"<<endl;
-  // hAvgYields->DrawCopy("ptexte");
 
-  if(isAntipart1 != isAntipart2) {
-    TH1D *hAvgYieldsAnti = ComputeAverageYields(eventParticles2,isAntipart2);
-    SetLambdaHistAxisLabels(hAvgYieldsAnti->GetXaxis(),isAntipart2);
+  if(pairType == kLamALam) {
+    TH1D *hAvgYieldsAnti = ComputeAverageYields(eventParticles2,kALam);
+    SetLambdaHistAxisLabels(hAvgYieldsAnti->GetXaxis(),kALam);
     cout<<"Writing AvgYield2"<<endl;
     hAvgYieldsAnti->Write(0,TObject::kOverwrite);
-    // TCanvas *c3 = new TCanvas("yieldsAnti","Avg Yields Antiparticles");
-    // cout<<"Drawing AvgYield2"<<endl;
-    // hAvgYieldsAnti->DrawCopy("ptexte");
   }
   cout<<"All finished!"<<endl;
 }
@@ -491,28 +500,23 @@ TH1D *FillLambdaYieldHist(const TTree *thermTree, const vector<int> &v0IDs, cons
 // }
 
 
-TH2D *GenerateLambdaParHisto(int nParticleTypes, const vector<TH1D*> &eventParticles1, const vector<TH1D*> &eventParticles2, const bool isAntipart1, const bool isAntipart2){
+TH2D *GenerateLambdaParHisto(int nParticleTypes, const vector<TH1D*> &eventParticles1, const vector<TH1D*> &eventParticles2, const PairType pairType){
   cout<<"Generating lambda parameter histograms."<<endl;
   // Make a histogram containing lambda parameters for each
   // pair type
-  double sumLambdaPars = 0.;
-  bool isPartAntipart = false;
   TString histName = "LambdaParams";
-  if(!isAntipart1) histName += "Particle";
-  else histName += "Antiparticle";
-  if(isAntipart1 != isAntipart2) {
-    histName += "Antiparticle";
-    isPartAntipart = true;
-  }
+  if(pairType == kLamLam) histName += "Particle";
+  else if(pairType == kALamALam) histName += "Antiparticle";
+  else histName += "ParticleAntiparticle";
   TH2D *hLambdaPars = new TH2D(histName, "Lambda Parameters by Pair Type", nParticleTypes, 0, nParticleTypes, nParticleTypes, 0, nParticleTypes);
   hLambdaPars->SetDirectory(0);
 
-  cout<<"Calculating lambda parameters"<<endl;
-  // cout<<"Part1\tPart2\tlambda\terror\n";
   // Loop over each type of pairs, and set the lambda
+  cout<<"Calculating lambda parameters"<<endl;
+  double sumLambdaPars = 0.;
   for(int iPart1 = 0; iPart1 < nParticleTypes; iPart1++){//First type of particle in pair
     int iter2 = iPart1;
-    if(isPartAntipart) iter2 = 0;
+    if(pairType == kLamALam) iter2 = 0;
     for(int iPart2 = iter2; iPart2 < nParticleTypes; iPart2++){
       double lambdaPar = -1.;
       double lambdaParError = 1.;
@@ -723,7 +727,7 @@ double ComputeLambdaNonIdenticalError(const int part1, const int part2, const ve
 }
 
 
-TH1D *ComputeAverageYields(const vector<TH1D*> &eventParticles, bool isAntiparticle)
+TH1D *ComputeAverageYields(const vector<TH1D*> &eventParticles, const Particle part)
 {
   //Find the average yields and std deviation for each particle type
   //Current error bars show the error of the avg calculation, not the
@@ -731,7 +735,7 @@ TH1D *ComputeAverageYields(const vector<TH1D*> &eventParticles, bool isAntiparti
   cout<<"Generating average yield histogram"<<endl;
   int nEvents = eventParticles.size();
   TString histName = "AvgYields";
-  if(isAntiparticle) histName += "Antiparticle";
+  if(part == kALam) histName += "Antiparticle";
   else histName += "Particle";
   TH1D *hAvgYields = eventParticles[0]->Clone(histName);
   TH1D *hAvgSquaredYields = eventParticles[0]->Clone("AvgSqrYields");
@@ -807,11 +811,11 @@ bool CheckIfPassDaughterCuts(const ParticleCoor *particle, const int pid)
   return true;
 }
 
-void SetLambdaHistAxisLabels(TAxis *axis, bool isAntiparticle)
+void SetLambdaHistAxisLabels(TAxis *axis, const Particle part)
 {
   // Use LaTeX to set the bin labels to their
   // corresponding particles
-  if(!isAntiparticle){
+  if(part == kLam){
     axis->SetBinLabel(1,"#Lambda");
     axis->SetBinLabel(2,"#Sigma^{0}");
     axis->SetBinLabel(3,"#Xi^{0}");
