@@ -31,13 +31,15 @@ class ParticleCoor;
 
 enum Particle {kProt = 2212, kAntiProt = -2212, 
 	       kPiPlus = 211, kPiMinus = -211, 
-	       kLam = 3122, kAntiLam = -3122};
-enum PairType {kLamLam, kALamALam, kLamALam};
+	       kLam = 3122, kALam = -3122};
+enum PairType {kLamLam=0, kALamALam=1, kLamALam=2};
 
 void EstimateLambdas(const PairType pairType, int nFiles=2)
 {
   // Main function. Generates list of file names
   // and pass them to RunSimpleLambdaEstimate
+  cout<<kLamLam<<"\t"<<kALamALam<<"\t"<<kLamALam<<endl;
+
   if( (pairType < kLamLam) || (pairType > kLamALam) ) {
     cout<<"Bad input pair type\n";
     return;
@@ -74,10 +76,18 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
   vector<TH1D*> eventParticles1;
   vector<TH1D*> secondParticleCollection; //Only use this if we want to estimate particle-antiparticle lambda parameters
   vector<TH1D*> &eventParticles2 = eventParticles1;
-  if(pairType == kLamALam) {
+  // cout<<"Address of eventParticles1\t"<<&eventParticles1<<endl;
+  // cout<<"Address of eventParticles2\t"<<&eventParticles2<<endl;
+  // cout<<"Address of secondParticleCollection\t"<<&secondParticleCollection<<endl;
+  if(kLamALam==pairType) {
+    cout<<"I am changing the particle collection.  Pair Type:\t"<<pairType<<endl;
     &eventParticles2 = secondParticleCollection; //We do have separate particles and antiparticles, so use a second collection
   }
   int nParticleTypes = 5;
+
+  // cout<<"Address of eventParticles1\t"<<&eventParticles1<<endl;
+  // cout<<"Address of eventParticles2\t"<<&eventParticles2<<endl;
+  // cout<<"Address of secondParticleCollection\t"<<&secondParticleCollection<<endl;
   GenerateYieldHistograms(nParticleTypes, inputFileNames, eventParticles1, eventParticles2, pairType);
 
   //Now that we have found all the strange particles, calculate lambda parameters for each pair type
@@ -123,7 +133,7 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
   cout<<"All finished!"<<endl;
 }
 
-void UseDaughtersToFindParents(const TTree *thermTree, UInt_t &nextEntry, const UInt_t finalEntry, const PairType thisPairType, vector<int> &lambdaIDs, vector<int> &antiLambdaIDs)
+void UseDaughtersToFindParents(const TTree *thermTree, Int_t &nextEntry, const Int_t finalEntry, const PairType thisPairType, vector<int> &lambdaIDs, vector<int> &antiLambdaIDs)
 {
   // Returns the particle IDs of all lambdas whose daughters
   // have been found.
@@ -152,10 +162,12 @@ void UseDaughtersToFindParents(const TTree *thermTree, UInt_t &nextEntry, const 
   assert(nBytesInEntry > 0);
   UInt_t currentEventID = particleEntry->eventid;
   cout<<"Event ID\t"<<currentEventID<<endl;
-  UInt_t iPart = nextEntry;
+  Int_t iPart = nextEntry;
   //////////////////
   // Loop over particles.  Stop when we reach a new event
   cout<<"About to loop over particles"<<endl;
+
+
   while(particleEntry->eventid == currentEventID)
   {
     Int_t pid = particleEntry->pid;
@@ -165,24 +177,44 @@ void UseDaughtersToFindParents(const TTree *thermTree, UInt_t &nextEntry, const 
     Int_t parentID = particleEntry->fathereid;
     if( (pid == kProt) && wantLams && (parentPid == kLam) ) {
       if(CheckIfPassDaughterCuts(particleEntry,pid)) {
-	protParentIDs.push_back(parentID);
+	// if(2327 == parentID) {
+	//   cout<<"I am Prot.  This should be an antilambda.  PID is \t"<<parentPid<<endl;
+	// }
+	protParentIDs.push_back(parentID+nextEntry);
+	// if(kALam == parentPid) cout<<"Proton with an antilambda parent???"<<endl;
       }
     }
-    else if( (pid == kAntiProt) && wantALams && (parentPid == kAntiLam) ) 
+    else if( (pid == kAntiProt) && wantALams && (parentPid == kALam) ) 
     {
       if(CheckIfPassDaughterCuts(particleEntry,pid)) {
-	antiprotParentIDs.push_back(parentID);
+	antiprotParentIDs.push_back(parentID+nextEntry);
+      // 	if(2327 == parentID) {
+      // 	  cout<<"I am AntiProt. This should be an antilambda.  PID is \t"<<parentPid<<endl;
+      // 	}
+      // 	if(2364 == parentID) {
+      // 	  cout<<"I am AntiProt. My mother should be an antilambda.  But the actual PID is \t"<<parentPid<<endl;
+      // 	}
       }
     }
-    else if( (pid == kPiPlus) && wantALams && (parentPid == kAntiLam) )
+    else if( (pid == kPiPlus) && wantALams && (parentPid == kALam) )
     {
       if(CheckIfPassDaughterCuts(particleEntry,pid)) {
-	piplusParentIDs.push_back(parentID);
+	piplusParentIDs.push_back(parentID+nextEntry);
+	// if(2327 == parentID) {
+	//   cout<<"I am PiPlus. This should be an antilambda.  PID is \t"<<parentPid<<endl;
+	// }
+	// if(2364 == parentID) {
+	//   cout<<"I am PiPlus. My mother should be an antilambda.  But the actual PID is \t"<<parentPid<<endl;
+	// }
       }
     }
     else if( (pid == kPiMinus) && wantLams && (parentPid == kLam) ) {
       if(CheckIfPassDaughterCuts(particleEntry,pid)) {
-	piminusParentIDs.push_back(parentID);
+	piminusParentIDs.push_back(parentID+nextEntry);
+	// if(2327 == parentID) {
+	//   cout<<"I am PiMinus. This should be an antilambda.  PID is \t"<<parentPid<<endl;
+	// }
+	// if(kALam == parentPid) cout<<"PiMinus with an antilambda parent???"<<endl;
       }
     }
 
@@ -194,16 +226,22 @@ void UseDaughtersToFindParents(const TTree *thermTree, UInt_t &nextEntry, const 
 
   ///////////////
   // Check for (anti)lambdas in both daughter lists
-  cout<<"Comparing daughter ID lists"<<endl;
-  cout<<"wantLams\t"<<wantLams<<"\twantALams\t"<<wantALams<<endl;
+  // cout<<"Comparing daughter ID lists"<<endl;
+  // cout<<"wantLams\t"<<wantLams<<"\twantALams\t"<<wantALams<<endl;
   if(wantLams) {
-    cout<<"Number of proton daughters\t"<<protParentIDs.size()<<endl;
-    cout<<"Number of pion daughters\t"<<piminusParentIDs.size()<<endl;
+    // cout<<"Number of proton daughters\t"<<protParentIDs.size()<<endl;
+    // cout<<"Number of pion daughters\t"<<piminusParentIDs.size()<<endl;
     for(int iProt; iProt < protParentIDs.size(); iProt++){
       const Int_t v0ID = protParentIDs[iProt];
       for(int iPi; iPi < piminusParentIDs.size(); iPi++){
 	if(v0ID == piminusParentIDs[iPi]) {
 	  lambdaIDs.push_back(v0ID);
+	  //debugging
+	  // if(2327 == v0ID) {
+	  //   thermTree->GetEntry(v0ID);
+	  //   cout<<"The PID of particle "<<v0ID<<" is "<<particleEntry->pid<<endl;
+	  // }
+	  //end debugging
 	  break;
 	}
       }
@@ -257,9 +295,9 @@ void GenerateYieldHistograms(const int nParticleTypes, vector<TString> &inputFil
     assert(NULL!=thermTree);
 
 
-    UInt_t nextEventFirstEntry = 0;
+    Int_t nextEventFirstEntry = 0;
 
-    UInt_t nThermEntries = thermTree->GetEntries();
+    Int_t nThermEntries = thermTree->GetEntries();
 
 
     while(nextEventFirstEntry < nThermEntries) {
@@ -269,7 +307,9 @@ void GenerateYieldHistograms(const int nParticleTypes, vector<TString> &inputFil
       vector<Int_t> lambdaIDs;
       vector<Int_t> antiLambdaIDs;
       UseDaughtersToFindParents(thermTree, nextEventFirstEntry, nThermEntries, pairType, lambdaIDs, antiLambdaIDs);
-      cout<<"Lambda candidates\t"<<lambdaIDs.size()<<endl;
+      if((kLamLam==pairType) || (kLamALam == pairType)) cout<<"Lambda candidates\t"<<lambdaIDs.size()<<endl;
+      if((kALamALam==pairType) || (kLamALam == pairType)) cout<<"AntiLambda candidates\t"<<antiLambdaIDs.size()<<endl;
+      
       //Only push back histogram vectors if we find V0s.
       if(!(lambdaIDs.size() == 0)) {
 	TH1D *lambdaYields = FillLambdaYieldHist(thermTree,lambdaIDs,eventCounter,kLam, nParticleTypes);
@@ -327,11 +367,12 @@ TH1D *FillLambdaYieldHist(const TTree *thermTree, const vector<Int_t> &v0IDs, co
   for(int iID = 0; iID < v0IDs.size(); iID++) 
   {
 
-    UInt_t currentID = v0IDs[iID];
+    Int_t currentID = v0IDs[iID];
     int nBytesInEntry = thermTree->GetEntry(currentID);
     assert(nBytesInEntry > 0);
     Int_t pid = particleEntry->pid;
-    cout<<"I should be a lambda.  My pid is\t"<<pid<<endl;
+    // cout<<"I should be a\t"<<part<<"\tMy pid is\t"<<pid<<"\teid:\t"<<currentID<<endl;
+    // if(kALam == pid) cout<<"AntiLambda!!! My eid is \t"<<currentID<<endl;
     assert(pid == part);
 
     //Make sure the particle passes reconstruction cuts
@@ -441,6 +482,7 @@ void ComputeLambdaIdentical(const int part1, const int part2, const vector<TH1D*
   //Compute average pairs and average total pairs
   // cout<<"Calculating num"<<endl;
   assert(nEffectiveEvents > 0);
+  cout<<"effective events: \t"<<nEffectiveEvents<<endl;
   double avgSpecPairs = (1.*nSpecPairs) / (1.*nEffectiveEvents);
   // cout<<"Calculating den"<<endl;
   double avgTotalPairs = (1.*nTotalPairs) / (1.*nEffectiveEvents);
@@ -489,6 +531,8 @@ void ComputeLambdaNonIdentical(const int part1, const int part2, const vector<TH
   } //end looping over events
     
   //Compute average pairs and average total pairs
+  assert(nEffectiveEvents > 0);
+  cout<<"effective events: \t"<<nEffectiveEvents<<endl;
   double avgSpecPairs = (1.*nSpecPairs) / (1.*nEffectiveEvents);
   double avgTotalPairs = (1.*nTotalPairs) / (1.*nEffectiveEvents);
   // cout<<"AvgSpecPairs:\t"<<avgSpecPairs<<",\tAvgTotalPairs"<<avgTotalPairs<<endl;
