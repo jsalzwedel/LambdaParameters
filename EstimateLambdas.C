@@ -133,10 +133,10 @@ void UseDaughtersToFindParents(const TTree *thermTree, UInt_t &nextEntry, const 
   // If both proton and pion daughter pass cuts, then add
   // lambda particle ID to vector.
 
-  vector<int> protParentIDs;
-  vector<int> antiprotParentIDs;
-  vector<int> piplusParentIDs;
-  vector<int> piminusParentIDs;
+  vector<Int_t> protParentIDs;
+  vector<Int_t> antiprotParentIDs;
+  vector<Int_t> piplusParentIDs;
+  vector<Int_t> piminusParentIDs;
   cout<<"Using daughters to find parents.  Pair type is\t"<<thisPairType<<endl;
   bool wantLams = false;
   bool wantALams = false;
@@ -158,11 +158,11 @@ void UseDaughtersToFindParents(const TTree *thermTree, UInt_t &nextEntry, const 
   cout<<"About to loop over particles"<<endl;
   while(particleEntry->eventid == currentEventID)
   {
-    int pid = particleEntry->pid;
+    Int_t pid = particleEntry->pid;
     // if((kPiPlus == pid) || (kPiMinus == pid) ) 
-    int parentPid = particleEntry->fatherpid;
+    Int_t parentPid = particleEntry->fatherpid;
     // if( (kLam == parentPid) && (kPiMinus == pid) ) cout<<"Found pion daughter!"<<endl;
-    int parentID = particleEntry->fathereid;
+    Int_t parentID = particleEntry->fathereid;
     if( (pid == kProt) && wantLams && (parentPid == kLam) ) {
       if(CheckIfPassDaughterCuts(particleEntry,pid)) {
 	protParentIDs.push_back(parentID);
@@ -200,7 +200,7 @@ void UseDaughtersToFindParents(const TTree *thermTree, UInt_t &nextEntry, const 
     cout<<"Number of proton daughters\t"<<protParentIDs.size()<<endl;
     cout<<"Number of pion daughters\t"<<piminusParentIDs.size()<<endl;
     for(int iProt; iProt < protParentIDs.size(); iProt++){
-      const int v0ID = protParentIDs[iProt];
+      const Int_t v0ID = protParentIDs[iProt];
       for(int iPi; iPi < piminusParentIDs.size(); iPi++){
 	if(v0ID == piminusParentIDs[iPi]) {
 	  lambdaIDs.push_back(v0ID);
@@ -213,7 +213,7 @@ void UseDaughtersToFindParents(const TTree *thermTree, UInt_t &nextEntry, const 
     cout<<"Number of antiproton daughters\t"<<antiprotParentIDs.size()<<endl;
     cout<<"Number of piplus daughters\t"<<piplusParentIDs.size()<<endl;
     for(int iProt; iProt < antiprotParentIDs.size(); iProt++){
-      const int v0ID = antiprotParentIDs[iProt];
+      const Int_t v0ID = antiprotParentIDs[iProt];
       for(int iPi; iPi < piplusParentIDs.size(); iPi++){
 	if(v0ID == piplusParentIDs[iPi]) {
 	  antiLambdaIDs.push_back(v0ID);
@@ -266,8 +266,8 @@ void GenerateYieldHistograms(const int nParticleTypes, vector<TString> &inputFil
       // For each event, find the daughters and use them to find the parents
       eventCounter++;
       cout<<"Processing event \t"<<eventCounter<<endl;
-      vector<int> lambdaIDs;
-      vector<int> antiLambdaIDs;
+      vector<Int_t> lambdaIDs;
+      vector<Int_t> antiLambdaIDs;
       UseDaughtersToFindParents(thermTree, nextEventFirstEntry, nThermEntries, pairType, lambdaIDs, antiLambdaIDs);
       cout<<"Lambda candidates\t"<<lambdaIDs.size()<<endl;
       //Only push back histogram vectors if we find V0s.
@@ -294,7 +294,7 @@ void GenerateYieldHistograms(const int nParticleTypes, vector<TString> &inputFil
   cout<<"Total events used:\t"<<eventCounter<<endl;
 }
 
-TH1D *FillLambdaYieldHist(const TTree *thermTree, const vector<int> &v0IDs, const int eventCounter, const Particle part, const int nParticleTypes)
+TH1D *FillLambdaYieldHist(const TTree *thermTree, const vector<Int_t> &v0IDs, const int eventCounter, const Particle part, const int nParticleTypes)
 {
   cout<<"Filling yield histogram for event "<<eventCounter<<endl;
   int strangePDGs[5] = {3122, //Lambda
@@ -327,10 +327,10 @@ TH1D *FillLambdaYieldHist(const TTree *thermTree, const vector<int> &v0IDs, cons
   for(int iID = 0; iID < v0IDs.size(); iID++) 
   {
 
-    int currentID = v0IDs[iID];
+    UInt_t currentID = v0IDs[iID];
     int nBytesInEntry = thermTree->GetEntry(currentID);
     assert(nBytesInEntry > 0);
-    int pid = particleEntry->pid;
+    Int_t pid = particleEntry->pid;
     cout<<"I should be a lambda.  My pid is\t"<<pid<<endl;
     assert(pid == part);
 
@@ -340,7 +340,7 @@ TH1D *FillLambdaYieldHist(const TTree *thermTree, const vector<int> &v0IDs, cons
     //Bin the particle according to its parent info
     for(int iPar = 0; iPar < nParticleTypes; iPar++)
     {
-      const int fpid = particleEntry->fatherpid;
+      const Int_t fpid = particleEntry->fatherpid;
       if(fpid == strangePDGs[iPar]) {
 	hParticles->Fill(iPar);
 	break;
