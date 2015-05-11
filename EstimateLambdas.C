@@ -150,8 +150,8 @@ void UseDaughtersToFindParents(const TTree *thermTree, Int_t &nextEntry, const I
   cout<<"Using daughters to find parents.  Pair type is\t"<<thisPairType<<endl;
   bool wantLams = false;
   bool wantALams = false;
-  if( (thisPairType == 1) || (thisPairType == 3) ) {cout<<"We want lambdas!\n"; wantLams = true;}
-  if( (thisPairType == 2) || (thisPairType == 3) ) {cout<<"We want AntLambdas!\n"; wantALams = true;}
+  if( (thisPairType == kLamLam) || (thisPairType == kLamALam) ) {cout<<"We want lambdas!\n"; wantLams = true;}
+  if( (thisPairType == kALamALam) || (thisPairType == kLamALam) ) {cout<<"We want AntLambdas!\n"; wantALams = true;}
 
   ParticleCoor *particleEntry = new ParticleCoor();
   TBranch *thermBranch = thermTree->GetBranch("particle");
@@ -228,6 +228,7 @@ void UseDaughtersToFindParents(const TTree *thermTree, Int_t &nextEntry, const I
   // Check for (anti)lambdas in both daughter lists
   // cout<<"Comparing daughter ID lists"<<endl;
   // cout<<"wantLams\t"<<wantLams<<"\twantALams\t"<<wantALams<<endl;
+  // int lambdaCount = 0;
   if(wantLams) {
     // cout<<"Number of proton daughters\t"<<protParentIDs.size()<<endl;
     // cout<<"Number of pion daughters\t"<<piminusParentIDs.size()<<endl;
@@ -236,6 +237,7 @@ void UseDaughtersToFindParents(const TTree *thermTree, Int_t &nextEntry, const I
       for(int iPi; iPi < piminusParentIDs.size(); iPi++){
 	if(v0ID == piminusParentIDs[iPi]) {
 	  lambdaIDs.push_back(v0ID);
+	  // cout<<"LambdaCount:\t"<<++lambdaCount<<endl;
 	  //debugging
 	  // if(2327 == v0ID) {
 	  //   thermTree->GetEntry(v0ID);
@@ -247,6 +249,7 @@ void UseDaughtersToFindParents(const TTree *thermTree, Int_t &nextEntry, const I
       }
     }
   }
+  // int antilambdaCount = 0;
   if(wantALams) {
     cout<<"Number of antiproton daughters\t"<<antiprotParentIDs.size()<<endl;
     cout<<"Number of piplus daughters\t"<<piplusParentIDs.size()<<endl;
@@ -255,6 +258,7 @@ void UseDaughtersToFindParents(const TTree *thermTree, Int_t &nextEntry, const I
       for(int iPi; iPi < piplusParentIDs.size(); iPi++){
 	if(v0ID == piplusParentIDs[iPi]) {
 	  antiLambdaIDs.push_back(v0ID);
+	  // cout<<"AntilambdaCount:\t"<<++antilambdaCount<<endl;
 	  break;
 	}
       }
@@ -382,7 +386,11 @@ TH1D *FillLambdaYieldHist(const TTree *thermTree, const vector<Int_t> &v0IDs, co
     for(int iPar = 0; iPar < nParticleTypes; iPar++)
     {
       const Int_t fpid = particleEntry->fatherpid;
-      if(fpid == strangePDGs[iPar]) {
+      if((kLam == part) && (fpid == strangePDGs[iPar])) {
+	hParticles->Fill(iPar);
+	break;
+      }
+      else if((kALam == part) && (fpid == -1*strangePDGs[iPar])) {
 	hParticles->Fill(iPar);
 	break;
       }
