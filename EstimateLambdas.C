@@ -38,8 +38,6 @@ void EstimateLambdas(const PairType pairType, int nFiles=2)
 {
   // Main function. Generates list of file names
   // and pass them to RunSimpleLambdaEstimate
-  cout<<kLamLam<<"\t"<<kALamALam<<"\t"<<kLamALam<<endl;
-
   if( (pairType < kLamLam) || (pairType > kLamALam) ) {
     cout<<"Bad input pair type\n";
     return;
@@ -147,11 +145,11 @@ void UseDaughtersToFindParents(const TTree *thermTree, Int_t &nextEntry, const I
   vector<Int_t> antiprotParentIDs;
   vector<Int_t> piplusParentIDs;
   vector<Int_t> piminusParentIDs;
-  cout<<"Using daughters to find parents.  Pair type is\t"<<thisPairType<<endl;
+  // cout<<"Using daughters to find parents.  Pair type is\t"<<thisPairType<<endl;
   bool wantLams = false;
   bool wantALams = false;
-  if( (thisPairType == kLamLam) || (thisPairType == kLamALam) ) {cout<<"We want lambdas!\n"; wantLams = true;}
-  if( (thisPairType == kALamALam) || (thisPairType == kLamALam) ) {cout<<"We want AntLambdas!\n"; wantALams = true;}
+  if( (thisPairType == kLamLam) || (thisPairType == kLamALam) ) {wantLams = true;}
+  if( (thisPairType == kALamALam) || (thisPairType == kLamALam) ) {wantALams = true;}
 
   ParticleCoor *particleEntry = new ParticleCoor();
   TBranch *thermBranch = thermTree->GetBranch("particle");
@@ -161,19 +159,17 @@ void UseDaughtersToFindParents(const TTree *thermTree, Int_t &nextEntry, const I
   int nBytesInEntry = thermTree->GetEntry(nextEntry);
   assert(nBytesInEntry > 0);
   UInt_t currentEventID = particleEntry->eventid;
-  cout<<"Event ID\t"<<currentEventID<<endl;
+  if(globalDebug) cout<<"Event ID\t"<<currentEventID<<endl;
   Int_t iPart = nextEntry;
   //////////////////
   // Loop over particles.  Stop when we reach a new event
-  cout<<"About to loop over particles"<<endl;
+  if(globalDebug) cout<<"About to loop over particles"<<endl;
 
 
   while(particleEntry->eventid == currentEventID)
   {
     const Int_t pid = particleEntry->pid;
-    // if((kPiPlus == pid) || (kPiMinus == pid) ) 
     const Int_t parentPid = particleEntry->fatherpid;
-    // if( (kLam == parentPid) && (kPiMinus == pid) ) cout<<"Found pion daughter!"<<endl;
     const Int_t parentID = particleEntry->fathereid;
     if( (pid == kProt) && wantLams && (parentPid == kLam) ) {
       if(CheckIfPassDaughterCuts(particleEntry,pid)) {
@@ -206,33 +202,28 @@ void UseDaughtersToFindParents(const TTree *thermTree, Int_t &nextEntry, const I
 
   ///////////////
   // Check for (anti)lambdas in both daughter lists
-  // cout<<"Comparing daughter ID lists"<<endl;
+  if(globalDebug) cout<<"Comparing daughter ID lists"<<endl;
   // cout<<"wantLams\t"<<wantLams<<"\twantALams\t"<<wantALams<<endl;
-  int lambdaCount = 0;
+  // int lambdaCount = 0;
   if(wantLams) {
-    cout<<"Number of proton daughters\t"<<protParentIDs.size()<<endl;
-    cout<<"Number of pion daughters\t"<<piminusParentIDs.size()<<endl;
+    if(globalDebug) cout<<"Number of proton daughters\t"<<protParentIDs.size()<<endl;
+    if(globalDebug) cout<<"Number of pion daughters\t"<<piminusParentIDs.size()<<endl;
     for(int iProt = 0; iProt < protParentIDs.size(); iProt++){
       const Int_t v0ID = protParentIDs[iProt];
       for(int iPi = 0; iPi < piminusParentIDs.size(); iPi++){
 	if(v0ID == piminusParentIDs[iPi]) {
 	  lambdaIDs.push_back(v0ID);
 	  // cout<<"LambdaCount:\t"<<++lambdaCount<<endl;
-	  //debugging
-	  // if(2327 == v0ID) {
-	  //   thermTree->GetEntry(v0ID);
-	  //   cout<<"The PID of particle "<<v0ID<<" is "<<particleEntry->pid<<endl;
-	  // }
-	  //end debugging
+
 	  break;
 	}
       }
     }
   }
-  int antilambdaCount = 0;
+  // int antilambdaCount = 0;
   if(wantALams) {
-    cout<<"Number of antiproton daughters\t"<<antiprotParentIDs.size()<<endl;
-    cout<<"Number of piplus daughters\t"<<piplusParentIDs.size()<<endl;
+    if(globalDebug) cout<<"Number of antiproton daughters\t"<<antiprotParentIDs.size()<<endl;
+    if(globalDebug) cout<<"Number of piplus daughters\t"<<piplusParentIDs.size()<<endl;
     for(int iProt = 0; iProt < antiprotParentIDs.size(); iProt++){
       const Int_t v0ID = antiprotParentIDs[iProt];
       // cout<<"Looking at antiproton number\t"<<iProt+1<<endl;
@@ -686,8 +677,8 @@ bool CheckIfPassDaughterCuts(const ParticleCoor *particle, const int pid)
   // Cuts can vary based on the type (i.e. pid) of particle
 
   // Check generic cuts
-
-
+  if(particle->GetPt() < 0.16) return false;
+  if(abs(particle->GetEtaP()) > 0.8) return false;
 
   // Check pid specific cuts
   if(pid == kProt) {
