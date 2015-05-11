@@ -102,7 +102,7 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
   }
   else {
     SetLambdaHistAxisLabels(hLambdaPars->GetXaxis(),kLam);
-    SetLambdaHistAxisLabels(hLambdaPars->GetYaxis(),AkLam);
+    SetLambdaHistAxisLabels(hLambdaPars->GetYaxis(),kALam);
   }
 
   TString outfileName = "LambdaPars.root";
@@ -170,51 +170,31 @@ void UseDaughtersToFindParents(const TTree *thermTree, Int_t &nextEntry, const I
 
   while(particleEntry->eventid == currentEventID)
   {
-    Int_t pid = particleEntry->pid;
+    const Int_t pid = particleEntry->pid;
     // if((kPiPlus == pid) || (kPiMinus == pid) ) 
-    Int_t parentPid = particleEntry->fatherpid;
+    const Int_t parentPid = particleEntry->fatherpid;
     // if( (kLam == parentPid) && (kPiMinus == pid) ) cout<<"Found pion daughter!"<<endl;
-    Int_t parentID = particleEntry->fathereid;
+    const Int_t parentID = particleEntry->fathereid;
     if( (pid == kProt) && wantLams && (parentPid == kLam) ) {
       if(CheckIfPassDaughterCuts(particleEntry,pid)) {
-	// if(2327 == parentID) {
-	//   cout<<"I am Prot.  This should be an antilambda.  PID is \t"<<parentPid<<endl;
-	// }
 	protParentIDs.push_back(parentID+nextEntry);
-	// if(kALam == parentPid) cout<<"Proton with an antilambda parent???"<<endl;
       }
     }
     else if( (pid == kAntiProt) && wantALams && (parentPid == kALam) ) 
     {
       if(CheckIfPassDaughterCuts(particleEntry,pid)) {
 	antiprotParentIDs.push_back(parentID+nextEntry);
-      // 	if(2327 == parentID) {
-      // 	  cout<<"I am AntiProt. This should be an antilambda.  PID is \t"<<parentPid<<endl;
-      // 	}
-      // 	if(2364 == parentID) {
-      // 	  cout<<"I am AntiProt. My mother should be an antilambda.  But the actual PID is \t"<<parentPid<<endl;
-      // 	}
       }
     }
     else if( (pid == kPiPlus) && wantALams && (parentPid == kALam) )
     {
       if(CheckIfPassDaughterCuts(particleEntry,pid)) {
 	piplusParentIDs.push_back(parentID+nextEntry);
-	// if(2327 == parentID) {
-	//   cout<<"I am PiPlus. This should be an antilambda.  PID is \t"<<parentPid<<endl;
-	// }
-	// if(2364 == parentID) {
-	//   cout<<"I am PiPlus. My mother should be an antilambda.  But the actual PID is \t"<<parentPid<<endl;
-	// }
       }
     }
     else if( (pid == kPiMinus) && wantLams && (parentPid == kLam) ) {
       if(CheckIfPassDaughterCuts(particleEntry,pid)) {
 	piminusParentIDs.push_back(parentID+nextEntry);
-	// if(2327 == parentID) {
-	//   cout<<"I am PiMinus. This should be an antilambda.  PID is \t"<<parentPid<<endl;
-	// }
-	// if(kALam == parentPid) cout<<"PiMinus with an antilambda parent???"<<endl;
       }
     }
 
@@ -228,13 +208,13 @@ void UseDaughtersToFindParents(const TTree *thermTree, Int_t &nextEntry, const I
   // Check for (anti)lambdas in both daughter lists
   // cout<<"Comparing daughter ID lists"<<endl;
   // cout<<"wantLams\t"<<wantLams<<"\twantALams\t"<<wantALams<<endl;
-  // int lambdaCount = 0;
+  int lambdaCount = 0;
   if(wantLams) {
-    // cout<<"Number of proton daughters\t"<<protParentIDs.size()<<endl;
-    // cout<<"Number of pion daughters\t"<<piminusParentIDs.size()<<endl;
-    for(int iProt; iProt < protParentIDs.size(); iProt++){
+    cout<<"Number of proton daughters\t"<<protParentIDs.size()<<endl;
+    cout<<"Number of pion daughters\t"<<piminusParentIDs.size()<<endl;
+    for(int iProt = 0; iProt < protParentIDs.size(); iProt++){
       const Int_t v0ID = protParentIDs[iProt];
-      for(int iPi; iPi < piminusParentIDs.size(); iPi++){
+      for(int iPi = 0; iPi < piminusParentIDs.size(); iPi++){
 	if(v0ID == piminusParentIDs[iPi]) {
 	  lambdaIDs.push_back(v0ID);
 	  // cout<<"LambdaCount:\t"<<++lambdaCount<<endl;
@@ -249,13 +229,14 @@ void UseDaughtersToFindParents(const TTree *thermTree, Int_t &nextEntry, const I
       }
     }
   }
-  // int antilambdaCount = 0;
+  int antilambdaCount = 0;
   if(wantALams) {
     cout<<"Number of antiproton daughters\t"<<antiprotParentIDs.size()<<endl;
     cout<<"Number of piplus daughters\t"<<piplusParentIDs.size()<<endl;
-    for(int iProt; iProt < antiprotParentIDs.size(); iProt++){
+    for(int iProt = 0; iProt < antiprotParentIDs.size(); iProt++){
       const Int_t v0ID = antiprotParentIDs[iProt];
-      for(int iPi; iPi < piplusParentIDs.size(); iPi++){
+      // cout<<"Looking at antiproton number\t"<<iProt+1<<endl;
+      for(int iPi = 0; iPi < piplusParentIDs.size(); iPi++){
 	if(v0ID == piplusParentIDs[iPi]) {
 	  antiLambdaIDs.push_back(v0ID);
 	  // cout<<"AntilambdaCount:\t"<<++antilambdaCount<<endl;
