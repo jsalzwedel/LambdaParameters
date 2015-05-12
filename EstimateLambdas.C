@@ -342,7 +342,6 @@ TH1D *FillLambdaYieldHist(const TTree *thermTree, const vector<Int_t> &v0IDs, co
 
   for(int iID = 0; iID < v0IDs.size(); iID++) 
   {
-
     Int_t currentID = v0IDs[iID];
     int nBytesInEntry = thermTree->GetEntry(currentID);
     assert(nBytesInEntry > 0);
@@ -666,6 +665,7 @@ bool CheckIfPassLambdaCuts(const ParticleCoor *particle)
   //Implement all sorts of reconstruction/detection cuts here
   double etaCut = 0.8;
   if( abs( particle->GetEtaP() ) >= etaCut) return false;
+  if( particle->GetPt() < 0.4 ) return false;
 
   //If we make it here, the particle passed all the cuts
   return true;
