@@ -61,6 +61,10 @@ void EstimateLambdas(const PairType pairType, int nFiles=2)
   // Load in the necessary therminator particle class
   gInterpreter->AddIncludePath("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/include");
   gROOT->LoadMacro("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/src/ParticleCoor.cxx");
+  
+  // // Finally, before we run, set the seed for the random
+  // // number generator that handles efficiency generation
+  // gRandom->SetSeed(1);
   RunSimpleLambdaEstimate(inputFileNames, pairType);
 }
 
@@ -102,6 +106,8 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
     SetLambdaHistAxisLabels(hLambdaPars->GetXaxis(),kLam);
     SetLambdaHistAxisLabels(hLambdaPars->GetYaxis(),kALam);
   }
+  // This will make the text larger when we use Draw("colztexte")
+  hLambdaPars->SetMarkerSize(1.5);
 
   TString outfileName = "LambdaPars.root";
   TFile outFile(outfileName,"update");
@@ -434,9 +440,9 @@ void ComputeLambdaIdentical(const int part1, const int part2, const vector<TH1D*
   int nEvents = eventParticles1.size();
   cout<<"Number of events in collection is\t"<<nEvents<<endl;
   int nEffectiveEvents = 0;
-  cout<<"Looping over events"<<endl;
+  // cout<<"Looping over events"<<endl;
   for(int iEv = 0; iEv < nEvents; iEv++){ 
-    cout<<"Event\t"<<iEv<<endl;
+    // cout<<"Event\t"<<iEv<<endl;
     double nTotalYield = eventParticles1[iEv]->Integral();
     // cout<<"Event "<<iEv<<":\tTotal yield\t"<<nTotalYield<<endl;
     if(1 >= nTotalYield) continue;
@@ -660,17 +666,6 @@ TH1D *ComputeAverageYields(const vector<TH1D*> &eventParticles, const Particle p
   return hAvgYields;
 }
 
-bool CheckIfPassLambdaCuts(const ParticleCoor *particle)
-{
-  //Implement all sorts of reconstruction/detection cuts here
-  double etaCut = 0.8;
-  if( abs( particle->GetEtaP() ) >= etaCut) return false;
-  if( particle->GetPt() < 0.4 ) return false;
-
-  //If we make it here, the particle passed all the cuts
-  return true;
-}
-
 bool CheckIfPassDaughterCuts(const ParticleCoor *particle, const int pid)
 {
   // Check if a daughter track passes various cuts.
@@ -697,6 +692,37 @@ bool CheckIfPassDaughterCuts(const ParticleCoor *particle, const int pid)
   // If we made it this far, the particle has passed all cuts
   return true;
 }
+
+bool CheckIfPassLambdaCuts(const ParticleCoor *particle)
+{
+  //Implement all sorts of reconstruction/detection cuts here
+  double etaCut = 0.8;
+  if( abs( particle->GetEtaP() ) >= etaCut) return false;
+  if( particle->GetPt() < 0.4 ) return false;
+
+  // //If we make it here, the particle passed all the cuts
+  // return true;
+
+  //Finally, let's simulate efficiency
+  return SimulateV0Efficiency();
+}
+
+bool SimulateV0Efficiency(/*const double pT*/)
+{
+  // Simulate the efficiency of reconstructing V0 efficiency.
+  //This could be pT dependent. But for now, just roll the
+  //dice and keep the particle if it falls under the limit.
+
+  //Overall efficiency is ~15%.  But that includes the 64%
+  //branching ratio, which is already accounted for by only
+  //taking proton+pion daughters. So, factoring 64% out of 
+  //15% gives us 23%.
+  double efficiency = 0.23;
+  if(gRandom->Rndm() < efficiency) return true;
+  else return false;
+}
+
+
 
 void SetLambdaHistAxisLabels(TAxis *axis, const Particle part)
 {
