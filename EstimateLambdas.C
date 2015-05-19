@@ -91,15 +91,21 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
   TH1D *hAvgYields = NULL;
   TH1D *hAvgYieldsAnti = NULL;
   if( (pairType == kLamLam) || (pairType == kLamALam) ) {
+    // Calculate average yields for lambdas
     hAvgYields = ComputeAverageYields(eventParticles1,kLam);
+    InjectFakes(eventParticles1, hAvgYields, nParticleTypes);
     SetLambdaHistAxisLabels(hAvgYields->GetXaxis(),kLam);
   }
   else {
+    // Calculate average yields for antilambdas
     hAvgYields = ComputeAverageYields(eventParticles1,kALam);
+    InjectFakes(eventParticles1, hAvgYields, nParticleTypes);
     SetLambdaHistAxisLabels(hAvgYields->GetXaxis(),kALam);
   }
   if(pairType == kLamALam) {
+    // Calculate average yields for antilambdas
     hAvgYieldsAnti = ComputeAverageYields(eventParticles2,kALam);
+    InjectFakes(eventParticles2, hAvgYieldsAnti, nParticleTypes);
     SetLambdaHistAxisLabels(hAvgYieldsAnti->GetXaxis(),kALam);
   }
 
@@ -393,17 +399,35 @@ TH1D *FillLambdaYieldHist(const TTree *thermTree, const vector<Int_t> &v0IDs, co
   return hParticles;
 }
 
-Int_t GenerateYieldOfFakes(double avgYield)
+double EstimateAvgFakes(double avgYield)
 {
   // Real events have some number of reconstructed fake lambdas.
   // In this analysis, rather than reconstruct them from primary 
-  // tracks, let's generate the "yield" of fakes from a poisson
-  // distribution based on an estimated mean number of fakes
-
+  // tracks, we'll generate the "yield" of fakes from a poisson
+  // distribution based on an estimated average number of fakes
   double purity = 0.95;
-  double avgFakes = avgYield * (1. - purity) / (purity);
-  Int_t nFakes = gRandom->Poisson(avgFakes);
-  return nFakes;
+  double estimatedAvgFakes = avgYield * (1. - purity) / (purity);
+  return estimatedAvgFakes;
+}
+
+void InjectFakes(const vector<TH1D*> &eventParticles, TH1D *hAvgYields, int nParticleTypes)
+{
+  double avgYield = hAvgYields->Integral();
+  int nEvents = eventParticles.size();
+  double totalFakes = 0.;
+  double estimatedAvgFakes = EstimateAvgFakes(avgYield);
+  for(int i = 0; i < nEvents; i++) {
+    Int_t nFakes = gRandom->Poisson(estimatedAvgFakes);
+    eventParticles[i]->SetBinContent(nParticleTypes, nFakes);
+    totalFakes += 1.*nFakes;
+  }
+  if(nEvents > 0)
+  {
+    double avgFakeYield = totalFakes/(1. * nEvents);
+    double stdDeviation = sqrt(estimatedAvgFakes);
+    hAvgYields->SetBinContent(nParticleTypes, avgFakeYield);
+    hAvgYields->SetBinError(nParticleTypes, stdDeviation);
+  }
 }
 
 TH2D *GenerateLambdaParHisto(int nParticleTypes, const vector<TH1D*> &eventParticles1, const vector<TH1D*> &eventParticles2, const PairType pairType){
@@ -764,5 +788,6 @@ void SetLambdaHistAxisLabels(TAxis *axis, const Particle part)
     axis->SetBinLabel(4,"#bar{#Xi}^{+}");
     axis->SetBinLabel(5,"#bar{#Omega}");
   }
+  axis->SetBinLabel(6,"Fake");
   axis->SetLabelSize(0.06);
 }
