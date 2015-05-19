@@ -83,7 +83,7 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
     cout<<"I am changing the particle collection.  Pair Type:\t"<<pairType<<endl;
     &eventParticles2 = secondParticleCollection; //We do have separate particles and antiparticles, so use a second collection
   }
-  int nParticleTypes = 5;
+  int nParticleTypes = 6; // 5 real hyperons + 1 fake
 
   GenerateYieldHistograms(nParticleTypes, inputFileNames, eventParticles1, eventParticles2, pairType);
 
@@ -98,8 +98,6 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
     hAvgYields = ComputeAverageYields(eventParticles1,kALam);
     SetLambdaHistAxisLabels(hAvgYields->GetXaxis(),kALam);
   }
-
-
   if(pairType == kLamALam) {
     hAvgYieldsAnti = ComputeAverageYields(eventParticles2,kALam);
     SetLambdaHistAxisLabels(hAvgYieldsAnti->GetXaxis(),kALam);
@@ -370,26 +368,27 @@ TH1D *FillLambdaYieldHist(const TTree *thermTree, const vector<Int_t> &v0IDs, co
     if(!CheckIfPassLambdaCuts(particleEntry)) continue;
     
     //Bin the particle according to its parent info
-    for(int iPar = 0; iPar < nParticleTypes; iPar++)
+    bool isResonance = true;
+    for(int iPar = 0; iPar < nParticleTypes -1; iPar++)
     {
       const Int_t fpid = particleEntry->fatherpid;
       if((kLam == part) && (fpid == strangePDGs[iPar])) {
 	hParticles->Fill(iPar);
+	isResonance = false;
 	break;
       }
       else if((kALam == part) && (fpid == -1*strangePDGs[iPar])) {
 	hParticles->Fill(iPar);
+	isResonance = false;
 	break;
       }
-      // If we reach the end of the last loop iteration,
-      // that means that the lambda parent isn't in
-      // our short list of PDG codes.  It must be a 
-      // short-lived resonance.  We'll just bin that
-      // as a primary (anti)lambda.
-      if(nParticleTypes-1 == iPar) {
-	hParticles->Fill(0);
-      }
     } // End loop over parent type
+
+    // If the lambda's parent doesn't match any of the
+    // PDG codes on our short list, then it must have
+    // come from a short-lived resonance.  We'll just
+    // bin it as a primary (anti)lambda.
+    if(isResonance) hParticles->Fill(0);
   } // End loop over V0s
   return hParticles;
 }
