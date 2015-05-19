@@ -384,6 +384,19 @@ TH1D *FillLambdaYieldHist(const TTree *thermTree, const vector<Int_t> &v0IDs, co
   return hParticles;
 }
 
+Int_t GenerateYieldOfFakes(double avgYield)
+{
+  // Real events have some number of reconstructed fake lambdas.
+  // In this analysis, rather than reconstruct them from primary 
+  // tracks, let's generate the "yield" of fakes from a poisson
+  // distribution based on an estimated mean number of fakes
+
+  double purity = 0.95;
+  double avgFakes = avgYield * (1. - purity) / (purity);
+  Int_t nFakes = gRandom->Poisson(avgFakes);
+  return nFakes;
+}
+
 TH2D *GenerateLambdaParHisto(int nParticleTypes, const vector<TH1D*> &eventParticles1, const vector<TH1D*> &eventParticles2, const PairType pairType){
   cout<<"Generating lambda parameter histograms."<<endl;
   // Make a histogram containing lambda parameters for each
