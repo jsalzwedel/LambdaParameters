@@ -78,22 +78,39 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
   vector<TH1D*> eventParticles1;
   vector<TH1D*> secondParticleCollection; //Only use this if we want to estimate particle-antiparticle lambda parameters
   vector<TH1D*> &eventParticles2 = eventParticles1;
-  // cout<<"Address of eventParticles1\t"<<&eventParticles1<<endl;
-  // cout<<"Address of eventParticles2\t"<<&eventParticles2<<endl;
-  // cout<<"Address of secondParticleCollection\t"<<&secondParticleCollection<<endl;
+
   if(kLamALam==pairType) {
     cout<<"I am changing the particle collection.  Pair Type:\t"<<pairType<<endl;
     &eventParticles2 = secondParticleCollection; //We do have separate particles and antiparticles, so use a second collection
   }
   int nParticleTypes = 5;
 
-  // cout<<"Address of eventParticles1\t"<<&eventParticles1<<endl;
-  // cout<<"Address of eventParticles2\t"<<&eventParticles2<<endl;
-  // cout<<"Address of secondParticleCollection\t"<<&secondParticleCollection<<endl;
   GenerateYieldHistograms(nParticleTypes, inputFileNames, eventParticles1, eventParticles2, pairType);
 
+  //Make, draw, and save a histo of average particle yields
+  TH1D *hAvgYields = NULL;
+  TH1D *hAvgYieldsAnti = NULL;
+  if( (pairType == kLamLam) || (pairType == kLamALam) ) {
+    hAvgYields = ComputeAverageYields(eventParticles1,kLam);
+    SetLambdaHistAxisLabels(hAvgYields->GetXaxis(),kLam);
+  }
+  else {
+    hAvgYields = ComputeAverageYields(eventParticles1,kALam);
+    SetLambdaHistAxisLabels(hAvgYields->GetXaxis(),kALam);
+  }
+
+
+  if(pairType == kLamALam) {
+    hAvgYieldsAnti = ComputeAverageYields(eventParticles2,kALam);
+    SetLambdaHistAxisLabels(hAvgYieldsAnti->GetXaxis(),kALam);
+  }
+
+
   //Now that we have found all the strange particles, calculate lambda parameters for each pair type
-  TH2D* hLambdaPars = GenerateLambdaParHisto(nParticleTypes, eventParticles1, eventParticles2, pairType);
+  TH2D* hLambdaPars = GenerateLambdaParHisto(nParticleTypes, 
+					     eventParticles1, 
+					     eventParticles2,
+					     pairType);
   if(pairType == kLamLam) {
     SetLambdaHistAxisLabels(hLambdaPars->GetXaxis(),kLam);
     SetLambdaHistAxisLabels(hLambdaPars->GetYaxis(),kLam);
@@ -109,31 +126,24 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
   // This will make the text larger when we use Draw("colztexte")
   hLambdaPars->SetMarkerSize(1.5);
 
+
+  // Write out all the results
   TString outfileName = "LambdaPars.root";
   TFile outFile(outfileName,"update");
   outFile.cd();
-  cout<<"Writing lambda histogram. Name:\t"<<hLambdaPars->GetName()<<endl;
-  hLambdaPars->Write(0,TObject::kOverwrite);
- 
-  //Make, draw, and save a histo of average particle yields
-  TH1D *hAvgYields = NULL;
-  if( (pairType == kLamLam) || (pairType == kLamALam) ) {
-    hAvgYields = ComputeAverageYields(eventParticles1,kLam);
-    SetLambdaHistAxisLabels(hAvgYields->GetXaxis(),kLam);
-  }
-  else {
-    hAvgYields = ComputeAverageYields(eventParticles1,kALam);
-    SetLambdaHistAxisLabels(hAvgYields->GetXaxis(),kALam);
-  }
-  cout<<"Writing AvgYield1"<<endl;
-  hAvgYields->Write(0,TObject::kOverwrite);
 
-  if(pairType == kLamALam) {
-    TH1D *hAvgYieldsAnti = ComputeAverageYields(eventParticles2,kALam);
-    SetLambdaHistAxisLabels(hAvgYieldsAnti->GetXaxis(),kALam);
+  if(hAvgYields) {
+    cout<<"Writing AvgYield1"<<endl;
+    hAvgYields->Write(0,TObject::kOverwrite);
+  }
+  if(hAvgYieldsAnti) {
     cout<<"Writing AvgYield2"<<endl;
     hAvgYieldsAnti->Write(0,TObject::kOverwrite);
   }
+  cout<<"Writing lambda histogram. Name:\t"<<hLambdaPars->GetName()<<endl;
+  hLambdaPars->Write(0,TObject::kOverwrite);
+ 
+
   cout<<"All finished!"<<endl;
 }
 
