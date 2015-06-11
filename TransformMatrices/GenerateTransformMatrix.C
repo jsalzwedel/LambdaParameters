@@ -7,7 +7,7 @@
 //
 //********************************************************************
 
-enum ParticlePID {kProt = 2212, kAntiProt = -2212, 
+enum ParticlePDG {kProt = 2212, kAntiProt = -2212, 
 		  kPiPlus = 211, kPiMinus = -211, 
 		  kLam = 3122, kALam = -3122};
 
@@ -106,9 +106,14 @@ vector<TString> GetTFileNames(const Int_t nFiles)
   return fileNames;
 }
 
-vector<Int_t> GetIDsOfLambdas(const Int_t parent1PDG, const Int_T parent2PDG, const TTree *thermTree, Int_t &firstEntry)
+vector<Int_t> GetIDsOfLambdas(const Int_t parent1PDG, const Int_T parent2PDG, const TTree *thermTree, Int_t &nextEntry)
 {
+  // Find daughters of lambdas/antilambdas.  Check if they pass cuts.
+  // If they do, check if their parent lambda passes cuts.  Return
+  // list of track IDs of lambdas that pass cuts.
 
+  // Determine which of proton, antiproton, pi+, pi- we need
+  vector<Int_t> daughterPDGs = DetermineRelevantDaughterPDGs(parent1PDG, parent2PDG);
 
   // Get the particle branch
   ParticleCoor *particleEntry = new ParticleCoor();
@@ -116,43 +121,140 @@ vector<Int_t> GetIDsOfLambdas(const Int_t parent1PDG, const Int_T parent2PDG, co
   thermBranch->SetAddress(particleEntry);
 
   //Get first particle in this event
-  int nBytesInEntry = thermTree->GetEntry(firstEntry);
+  const Int_t startingEntry = nextEntry;
+  const Int_t finalEntry = thermTree->GetEntries();
+  int nBytesInEntry = thermTree->GetEntry(startingEntry);
   assert(nBytesInEntry > 0);
   UInt_t currentEventID = particleEntry->eventid;
-
-  // Determine which of proton, antiproton, pi+, pi- we need
-  vector<Int_t> daughterPIDs;
-  if((parent1PDG > 0) || (parent2PDG > 0)) { //want lambdas
-    daughterPIDs.push_back(kProt);
-    daughterPIDs.push_back(kPiMinus);
-  }
-  if((parent1PDG < 0) || (parent2PDG < 0)) { // want antilambdas
-    daughterPIDs.push_back(kAntiProt); 
-    daughterPIDs.push_back(kPiPlus); 
-  }
   
+  // Vector to store lambda/antilambda event IDs for daughters that
+  // pass cuts
+  vector<Int_t> lambdaCandidateIDs;
+
   //loop over all the particles in the event
   while(particleEntry->eventid == currentEventID)
   {
+    const Int_t pid = particleEntry->pid;
+    const Int_t parentPid = particleEntry->fatherpid;
+    const Int_t parentID = particleEntry->fathereid;
+    
+    // If particle doesn't have a lambda/antilambda parent, ignore it
+    if((parentPid != parent1PDG) && (parentPid != parent2PDG)) continue;
+
+    //check if particle matches one of the relevant daughterPDGs
+    for(Int_t iPDG = 0; iPDG < daughterPDGs.size(); iPDG++)
+    {
+      if(pid == daughterPDGs[iPDG]) {
+	// if the daughter passes all cuts, add its parent ID to list
+	if(CheckIfPassDaugherCuts(particleEntry)) {
+	  lambdaCandidateIDs.push_back(parentID+startingEntry);
+	}
+	break;
+      }
+    }
+    nextEntry++;
+    if(finalEntry == nextEntry) break; //Reached the end of the file
+    
+    //Get the next entry
+    nBytesInEntry = thermTree->GetEntry(nextEntry);
+    assert(nBytesInEntry > 0);
+  } // end loop over each track in event
 
 
-    //check if particle matcheS one of daughterPIDs
-    //check if it has a lambda parent
-    //check if the daughter passes cuts
-    //add parent track ID to list
-
-  }
-
-  for(/* each parent trac ID*/)
+ // Vector to store IDs of (anti)lambdas that pass all cuts
+  vector<Int_t> finalV0IDs;
+  for(Int_t iV01=0; iV01 < lambdaCandidateIDs.size(); iV01++)
   {
-    //check if it appears twice in the list (once for each daughter)
-    //check if it passes cuts
-    //add track ID to final list
-  }
+    // Check which V0 entries appear twice in the list (once for
+    // the positive daughter, once for the negative daughter).
+    // If it appears twice AND it passes cuts, add it to final V0
+    // list.
+    const Int_t v0ID = lambdaCandidateIDs[iV01];
+    for(Int_t iV02 = iV01+1; iV02 < lambdaCandidateIDs.size(); iV02++);
+    {
+      if(v0ID == lambdaCandidateIDs[iV02]){
+	//Now get the V0 and check if it passes cuts
+	nBytesInEntry = thermTree->GetEntry(v0ID);
+	assert(nBytesInEntry > 0);
+	assert(particleEntry->pid == abs(kLam));
+	if(CheckIfPassLambdaCuts(particleEntry)) finalV0IDs.push_back(v0ID);
+	break;
+      }
+    }
+  } // End loop over V0 candidates
 
   delete particleEntry;
-
   return lambdaIDs;
+}
+
+  // Determine which of proton, antiproton, pi+, pi- we need
+vector<Int_t> DetermineRelevantDaughterPDGs(const Int_t parent1PDG, const Int_T parent2PDG)
+{
+  // Use particle/antiparticle info of lambda/antilambdas to determine
+  // which daughters we need to look for
+  vector<Int_t> daughterPDGs;
+  if((parent1PDG > 0) || (parent2PDG > 0)) { //want lambda daughters
+    daughterPDGs.push_back(kProt);
+    daughterPDGs.push_back(kPiMinus);
+  }
+  if((parent1PDG < 0) || (parent2PDG < 0)) { // want antilambda daughters
+    daughterPDGs.push_back(kAntiProt); 
+    daughterPDGs.push_back(kPiPlus); 
+  }
+  return daughterPDGs;
+}
+
+bool CheckIfPassDaughterCuts(const ParticleCoor *particle)
+{
+  // Check if a daughter track passes various cuts.
+  // Cuts can vary based on the type (i.e. pid) of particle
+
+  // Check generic cuts
+  if(particle->GetPt() < 0.16) return false;
+  if(abs(particle->GetEtaP()) > 0.8) return false;
+  
+  // Check pid specific cuts
+  const Int_t pid = particle->pid;
+  if(pid == kProt) {
+    if(particle->GetPt() < 0.5) return false;
+  }
+  else if(pid == kAntiProt) {
+    if(particle->GetPt() < 0.3) return false;
+  }
+  else if(pid == kPiPlus) {
+  }
+  else if(pid == kPiMinus) {
+  }
+  // If we made it this far, the particle has passed all cuts
+  return true;
+}
+
+bool CheckIfPassLambdaCuts(const ParticleCoor *particle, const Int_t parent1PDG, const Int_t parent2PDG)
+{
+  //Implement all sorts of reconstruction/detection cuts here
+  double etaCut = 0.8;
+  if( abs( particle->GetEtaP() ) >= etaCut) return false;
+  if( particle->GetPt() < 0.4 ) return false;
+
+  // // Make sure the V0 has one of the parents that we care about
+  // const Int_t parentPID = particle->fatherpid;
+  // if(parentPID == parent1PDG) return true;
+  // else if(parentPID == parent2PDG) return true;
+
+  // // If we want "primary" lambdas, check that we also accept
+  // // lambdas coming from resonance decays
+  // if((abs(parent1PDG) == 3122) || (abs(parent2PDG) == 3122)){
+  //   //We want primary (anti)lambdas, and (anti)lambdas that come
+  //   //from resonanaces.  Let's make sure this particle
+  //   //doesn't come from some other source.
+    
+  //   // loop over other PDG types, return false if this matches that
+  //   // PDG value
+  // }
+
+
+  // //If we make it here, the particle passed all the cuts
+  return true;
 }
 
 vector<Int_t> GetParentIDs(vector<Int_t> &lambdaIDs, Int_t parentPDG, TTree *thermTree)
