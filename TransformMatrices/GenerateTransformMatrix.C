@@ -25,17 +25,25 @@ void GenerateTransformMatrix(const Int_t nFiles)
   
   vector<TString> fileNames = GetTFileNames(nFiles);
 
+  // Loop over each file
   for (Int_t iFile = 0; iFile < nFiles; iFile++)
   {
+    // Read in the file and get the particle branch
     TFile inFile(fileNames[iFile], "read");
     assert(NULL != &inFile);
-
     TTree *thermTree = (TTree*) inFile.Get("particles");
     assert(NULL != thermTree);
 
     // do stuff ...
-    for(/* each particular event */) {
-      vector<Int_t> lambdaIDs = GetIDsOfLambdas(parent1PDG, parent2PDG, thermTree);
+    Int_t nThermEntries = thermTree->GetEntries();
+    Int_t nextEntry = 0;
+
+    // Find lambdas and parents for each event, and bin in kstar
+    while(nextEntry < nThermEntries) {
+      // GetIDsOfLambdas will run through each particle starting from 
+      // nextEntry and ending when it hits a new event.  That entry 
+      // will then be set to nextEntry.
+      vector<Int_t> lambdaIDs  = GetIDsOfLambdas(parent1PDG, parent2PDG, thermTree, nextEntry);
       vector<Int_t> parent1IDs = GetParentIDs(&lambdaIDs, parent1PDG, thermTree);
       vector<Int_t> parent2IDs = GetParentIDs(&lambdaIDs, parent2PDG, thermTree);
       FillTransformMatrix(hTransform, &parent1IDs, &parent2IDs, &lambdaIDs, thermTree);
@@ -47,8 +55,7 @@ void GenerateTransformMatrix(const Int_t nFiles)
   outFile.cd();
   hTransform->Write(0,TObject::kOverwrite);
   cout<<"Transform matrix "<<hTransform->GetName()
-      <<" written to "<<outFileName<<endl;
-  
+      <<" written to "<<outFileName<<endl; 
 }
 
 
@@ -99,7 +106,7 @@ vector<TString> GetTFileNames(const Int_t nFiles)
   return fileNames;
 }
 
-vector<Int_t> GetIDsOfLambdas(const Int_t parent1PDG, const Int_T parent2PDG, const TTree *thermTree, Int_t &firstEntry, const Int_t finalEntry)
+vector<Int_t> GetIDsOfLambdas(const Int_t parent1PDG, const Int_T parent2PDG, const TTree *thermTree, Int_t &firstEntry)
 {
 
 
