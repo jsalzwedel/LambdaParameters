@@ -13,6 +13,7 @@ enum ParticlePDG {kProt = 2212, kAntiProt = -2212,
 
 
 
+
 void GenerateTransformMatrix(const Int_t nFiles)
 {
   // Main function.  Specify how many input files to use and this
@@ -34,7 +35,6 @@ void GenerateTransformMatrix(const Int_t nFiles)
     TTree *thermTree = (TTree*) inFile.Get("particles");
     assert(NULL != thermTree);
 
-    // do stuff ...
     Int_t nThermEntries = thermTree->GetEntries();
     Int_t nextEntry = 0;
 
@@ -43,9 +43,10 @@ void GenerateTransformMatrix(const Int_t nFiles)
       // GetIDsOfLambdas will run through each particle starting from 
       // nextEntry and ending when it hits a new event.  That entry 
       // will then be set to nextEntry.
+      Int_t firstEntryInEvent = nextEntry;
       vector<Int_t> lambdaIDs  = GetIDsOfLambdas(parent1PDG, parent2PDG, thermTree, nextEntry);
-      vector<Int_t> parent1IDs = GetParentIDs(&lambdaIDs, parent1PDG, thermTree);
-      vector<Int_t> parent2IDs = GetParentIDs(&lambdaIDs, parent2PDG, thermTree);
+      vector<Int_t> parent1IDs = GetParentIDs(&lambdaIDs, parent1PDG, thermTree, firstEntryInEvent);
+      vector<Int_t> parent2IDs = GetParentIDs(&lambdaIDs, parent2PDG, thermTree, firstEntryInEvent);
       FillTransformMatrix(hTransform, &parent1IDs, &parent2IDs, &lambdaIDs, thermTree);
     }
   }
@@ -257,10 +258,68 @@ bool CheckIfPassLambdaCuts(const ParticleCoor *particle, const Int_t parent1PDG,
   return true;
 }
 
-vector<Int_t> GetParentIDs(vector<Int_t> &lambdaIDs, Int_t parentPDG, TTree *thermTree)
+vector<Int_t> GetParentIDs(const vector<Int_t> &v0IDs, Int_t parentPDG, TTree *thermTree, Int_t firstEventEntry)
 {
+  // Use the list of lambdas to find lambdas with the correct parent.
+  // Save the parent IDs in the vector.
 
+  // Make a vector to hold parentIDs.  This will be the same size as the
+  // LambdaID vector.  If the lambda doesn't have an appropriate parent,
+  // just leave the entry as -1.  Otherwise, put in the parent's ID number
+  vector<Int_T> parentIDs(lambdasIDs.size(),-1);
+
+  // Prepare to get particles from the TBranch
+  ParticleCoor *particleEntry = new ParticleCoor;
+  TBranch *thermBranch = thermTree->GetBranch("particle");
+  thermBranch->SetAddress(particleEntry);
+  
+  // Loop over all the lambdas and find the lambdas with a parent
+  // that matches parentPDG
+  Int_t nV0s = v0IDs.size();
+  for(Int_t iID = 0; iID < nV0s; iID++){
+    // Get a V0 and check that it exists
+    Int_t currentID = v0IDs[iID];
+    int nBytesInEntry = thermTree->GetEntry(currentID);
+    assert(nBytesInEntry > 0);
+    
+    // Check parentage
+    const Int_t fatherPID = particleEntry->fatherpid;
+    if(fatherPID == parentPDG) {
+      // We found one of the parents we want.  Save its absolute ID.
+      parentIDs[iID] = particleEntry->fathereid + firstEventEntry;
+    }
+    // Special case where we want "primary" lambdas.  Here, we also
+    // accept lambdas where the parent is a short-lived resonance.
+    else if(particleEntry->pid == parentPDG) {
+      // Check that it isn't one of the standard weak/EM decays
+      bool isElectroWeakDecay = false;
+      for(int iEMW = 0; iEMW < 4; iEMW++)
+      {
+	if(fatherPID == TMath::sign(GetElectroWeakPDG(iEMW), parentPDG)) {
+	  isElectroWeakDecay = true;
+	  break;
+	}
+      }
+      if(!isElectroWeakDecay) {
+	// This came from a resonance.  Use the lambda's eid.
+	parentIDs[iID] = particleEntry->eid + firstEventEntry;
+      }
+    }
+
+  }
+
+  return parentIDs;
 }
+
+Int_t GetElectroWeakPDG(Int_t index)
+{
+  assert ((-1 < index) && (index < 4));
+  if     (0 == index) return 3212; // Sigma0
+  else if(1 == index) return 3312; // Xi-
+  else if(2 == index) return 3322; // Xi0
+  else                return 3334; // Omega
+}
+
 
 void FillTransformMatrix(TH2D *hTransform, vector<Int_t> &parent1IDs, vector<Int_t> &parent2IDs, vector<Int_t> &lambdaIDs, TTree *thermTree);
 
