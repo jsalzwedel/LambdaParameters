@@ -158,8 +158,10 @@ vector<Int_t> GetIDsOfLambdas(const Int_t parent1PDG, const Int_t parent2PDG, co
   // Vector to store lambda/antilambda event IDs for daughters that
   // pass cuts
   vector<Int_t> lambdaCandidateIDs;
-  cout<<"The final entry is "<<finalEntry<<endl;
+  cout<<"This event is "<<currentEventID<<endl;
+  // cout<<"The final entry is "<<finalEntry<<endl;
   //loop over all the particles in the event
+  
   while(particleEntry->eventid == currentEventID)
   {
     // cout<<"In event "<<particleEntry->eventid<<". Current entry is "<<nextEntry<<endl;
@@ -177,7 +179,7 @@ vector<Int_t> GetIDsOfLambdas(const Int_t parent1PDG, const Int_t parent2PDG, co
 	  // if the daughter passes all cuts, add its parent ID to list
 	  if(CheckIfPassDaughterCuts(particleEntry)) {
 	    lambdaCandidateIDs.push_back(parentID+startingEntry);
-	    cout<<"Found a candidate"<<endl;
+	    // cout<<"Found a candidate"<<endl;
 	  }
 	  break;
 	}
@@ -194,22 +196,35 @@ vector<Int_t> GetIDsOfLambdas(const Int_t parent1PDG, const Int_t parent2PDG, co
 
  // Vector to store IDs of (anti)lambdas that pass all cuts
   vector<Int_t> finalV0IDs;
-  for(Int_t iV01=0; iV01 < lambdaCandidateIDs.size(); iV01++)
+  Int_t nCandidates = lambdaCandidateIDs.size();
+  cout<<"Number of candidates:\t"<<nCandidates<<endl;
+  for(Int_t iV01=0; iV01 < nCandidates; iV01++)
   {
     // Check which V0 entries appear twice in the list (once for
     // the positive daughter, once for the negative daughter).
     // If it appears twice AND it passes cuts, add it to final V0
     // list.
     const Int_t v0ID = lambdaCandidateIDs[iV01];
-    for(Int_t iV02 = iV01+1; iV02 < lambdaCandidateIDs.size(); iV02++);
+    // cout<<iV01<<"\t"<<v0ID<<endl;
+    // const Int_t v0ID2 = lambdaCandidateIDs[iV01+1];
+    // cout<<iV01<<"\t"<<iV01+1<<endl;
+    for(Int_t iV02 = iV01+1; iV02 < nCandidates; iV02++)
     {
-      if(v0ID == lambdaCandidateIDs[iV02]){
-	//Now get the V0 and check if it passes cuts
-	nBytesInEntry = thermTree->GetEntry(v0ID);
-	assert(nBytesInEntry > 0);
-	assert(particleEntry->pid == abs(kLam));
-	if(CheckIfPassLambdaCuts(particleEntry)) finalV0IDs.push_back(v0ID);
-	break;
+      const Int_t v0ID2 = lambdaCandidateIDs[iV02];
+      // cout<<"\t\t"<<iV02<<"\t"<<v0ID2<<endl;
+      // cout<<iV01<<"\t"<<iV02<<endl;
+      if(v0ID == v0ID2){
+    	//Now get the V0 and check if it passes cuts
+    	nBytesInEntry = thermTree->GetEntry(v0ID);
+    	assert(nBytesInEntry > 0);
+    	assert(particleEntry->pid == abs(kLam));
+	
+    	if(CheckIfPassLambdaCuts(particleEntry, parent1PDG, parent2PDG)) {
+    	  // cout<<"Candidate passed cut"<<endl;
+    	  finalV0IDs.push_back(v0ID);
+	}
+    	// else cout<<"Candidate failed cut"<<endl;
+    	break;
       }
     }
   } // End loop over V0 candidates
@@ -298,7 +313,7 @@ vector<Int_t> GetParentIDs(const vector<Int_t> &v0IDs, Int_t parentPDG, TTree *t
   // Make a vector to hold parentIDs.  This will be the same size as the
   // LambdaID vector.  If the lambda doesn't have an appropriate parent,
   // just leave the entry as -1.  Otherwise, put in the parent's ID number
-  vector<Int_t> parentIDs = (v0IDs.size(),-1);
+  vector<Int_t> parentIDs (v0IDs.size(),-1);
 
   // Prepare to get particles from the TBranch
   ParticleCoor *particleEntry = new ParticleCoor;
@@ -308,6 +323,7 @@ vector<Int_t> GetParentIDs(const vector<Int_t> &v0IDs, Int_t parentPDG, TTree *t
   // Loop over all the lambdas and find the lambdas with a parent
   // that matches parentPDG
   Int_t nV0s = v0IDs.size();
+  cout<<"Found "<<nV0s<<" in the last step"<<endl;
   for(Int_t iID = 0; iID < nV0s; iID++){
     // Get a V0 and check that it exists and is a (anti)lambda
     Int_t currentID = v0IDs[iID];
