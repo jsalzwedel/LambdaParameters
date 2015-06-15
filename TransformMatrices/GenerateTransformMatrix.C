@@ -7,14 +7,17 @@
 //
 //********************************************************************
 
-enum ParticlePDG {kProt = 2212, kAntiProt = -2212, 
-		  kPiPlus = 211, kPiMinus = -211, 
-		  kLam = 3122, kALam = -3122};
-
+enum ParticlePDG {kProt   = 2212,  kAntiProt = -2212, 
+		  kPiPlus = 211,   kPiMinus  = -211, 
+		  kLam    = 3122,  kALam     = -3122,
+		  kSigma  = 3212,  kASigma   = -3212,
+		  kXiC    = 3312,  kAXiC     = -3312,
+		  kXi0    = 3322,  kAXi0     = -3322,
+		  kOmega  = 3334,  kAOmega   = -3334};
 class ParticleCoor;
 
 
-void GenerateTransformMatrix(const Int_t nFiles)
+void GenerateTransformMatrix(const Int_t nFiles, Int_t)
 {
   // Main function.  Specify how many input files to use and this
   // will generate a list of file names to use and pass them on.
@@ -108,7 +111,16 @@ vector<TString> GetTFileNames(const Int_t nFiles)
 {
   // Use the number of files to generate a list of event file names
   vector<TString> fileNames;
-  // ...
+  
+  for(Int_t i = 0; i < nFiles; i++){
+    TString name = "~/Analysis/lambda/AliAnalysisLambda/therminator2/events/lhyquid3v-LHCPbPb2760b2.3Ti512t0.60Tf140a0.08b0.08h0.24x2.3v2/event";
+    if(i < 10) name += "00";
+    else if(i < 100) name += "0";
+    name += i;
+    name += ".root";
+    fileNames.push_back(name);
+  }
+
   return fileNames;
 }
 
@@ -317,12 +329,14 @@ vector<Int_t> GetParentIDs(const vector<Int_t> &v0IDs, Int_t parentPDG, TTree *t
 Int_t GetElectroWeakPDG(Int_t index)
 {
   assert ((-1 < index) && (index < 4));
-  if     (0 == index) return 3212; // Sigma0
-  else if(1 == index) return 3312; // Xi-
-  else if(2 == index) return 3322; // Xi0
-  else                return 3334; // Omega
+  if     (0 == index) return kSigma;
+  else if(1 == index) return kXiC; 
+  else if(2 == index) return kXi0; 
+  else                return kOmega;
 }
 
 
 void FillTransformMatrix(TH2D *hTransform, vector<Int_t> &parent1IDs, vector<Int_t> &parent2IDs, vector<Int_t> &lambdaIDs, TTree *thermTree);
+{
 
+}
