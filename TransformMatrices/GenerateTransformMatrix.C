@@ -11,13 +11,18 @@ enum ParticlePDG {kProt = 2212, kAntiProt = -2212,
 		  kPiPlus = 211, kPiMinus = -211, 
 		  kLam = 3122, kALam = -3122};
 
-
+class ParticleCoor;
 
 
 void GenerateTransformMatrix(const Int_t nFiles)
 {
   // Main function.  Specify how many input files to use and this
   // will generate a list of file names to use and pass them on.
+
+  // Load in the necessary therminator particle class
+  gInterpreter->AddIncludePath("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/include");
+  gROOT->LoadMacro("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/src/ParticleCoor.cxx");
+
   
   Int_t parent1PDG; //Pass this in somehow
   Int_t parent2PDG;
@@ -107,7 +112,7 @@ vector<TString> GetTFileNames(const Int_t nFiles)
   return fileNames;
 }
 
-vector<Int_t> GetIDsOfLambdas(const Int_t parent1PDG, const Int_T parent2PDG, const TTree *thermTree, Int_t &nextEntry)
+vector<Int_t> GetIDsOfLambdas(const Int_t parent1PDG, const Int_t parent2PDG, const TTree *thermTree, Int_t &nextEntry)
 {
   // Find daughters of lambdas/antilambdas.  Check if they pass cuts.
   // If they do, check if their parent lambda passes cuts.  Return
@@ -189,7 +194,7 @@ vector<Int_t> GetIDsOfLambdas(const Int_t parent1PDG, const Int_T parent2PDG, co
 }
 
   // Determine which of proton, antiproton, pi+, pi- we need
-vector<Int_t> DetermineRelevantDaughterPDGs(const Int_t parent1PDG, const Int_T parent2PDG)
+vector<Int_t> DetermineRelevantDaughterPDGs(const Int_t parent1PDG, const Int_t parent2PDG)
 {
   // Use particle/antiparticle info of lambda/antilambdas to determine
   // which daughters we need to look for
@@ -266,7 +271,7 @@ vector<Int_t> GetParentIDs(const vector<Int_t> &v0IDs, Int_t parentPDG, TTree *t
   // Make a vector to hold parentIDs.  This will be the same size as the
   // LambdaID vector.  If the lambda doesn't have an appropriate parent,
   // just leave the entry as -1.  Otherwise, put in the parent's ID number
-  vector<Int_T> parentIDs(lambdasIDs.size(),-1);
+  vector<Int_T> parentIDs(v0IDs.size(),-1);
 
   // Prepare to get particles from the TBranch
   ParticleCoor *particleEntry = new ParticleCoor;
@@ -277,11 +282,11 @@ vector<Int_t> GetParentIDs(const vector<Int_t> &v0IDs, Int_t parentPDG, TTree *t
   // that matches parentPDG
   Int_t nV0s = v0IDs.size();
   for(Int_t iID = 0; iID < nV0s; iID++){
-    // Get a V0 and check that it exists
+    // Get a V0 and check that it exists and is a (anti)lambda
     Int_t currentID = v0IDs[iID];
     int nBytesInEntry = thermTree->GetEntry(currentID);
     assert(nBytesInEntry > 0);
-    
+    assert(abs(particleEntry->pid) == kLam);
     // Check parentage
     const Int_t fatherPID = particleEntry->fatherpid;
     if(fatherPID == parentPDG) {
@@ -295,7 +300,7 @@ vector<Int_t> GetParentIDs(const vector<Int_t> &v0IDs, Int_t parentPDG, TTree *t
       bool isElectroWeakDecay = false;
       for(int iEMW = 0; iEMW < 4; iEMW++)
       {
-	if(fatherPID == TMath::sign(GetElectroWeakPDG(iEMW), parentPDG)) {
+	if( abs(fatherPID) == abs(GetElectroWeakPDG(iEMW)) ) {
 	  isElectroWeakDecay = true;
 	  break;
 	}
@@ -305,9 +310,7 @@ vector<Int_t> GetParentIDs(const vector<Int_t> &v0IDs, Int_t parentPDG, TTree *t
 	parentIDs[iID] = particleEntry->eid + firstEventEntry;
       }
     }
-
-  }
-
+  } // end loop over v0 candidates
   return parentIDs;
 }
 
