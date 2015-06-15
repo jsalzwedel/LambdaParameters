@@ -16,8 +16,11 @@ enum ParticlePDG {kProt   = 2212,  kAntiProt = -2212,
 		  kOmega  = 3334,  kAOmega   = -3334};
 class ParticleCoor;
 
+//Was having a problem including a therminator file.
+//This fixes it.
+#define _CXX_VER_ "g++(4.9.1)" 
 
-void GenerateTransformMatrix(const Int_t nFiles, Int_t)
+void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2PDG)
 {
   // Main function.  Specify how many input files to use and this
   // will generate a list of file names to use and pass them on.
@@ -27,8 +30,8 @@ void GenerateTransformMatrix(const Int_t nFiles, Int_t)
   gROOT->LoadMacro("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/src/ParticleCoor.cxx");
 
   
-  Int_t parent1PDG; //Pass this in somehow
-  Int_t parent2PDG;
+  // Int_t parent1PDG; //Pass this in somehow
+  // Int_t parent2PDG;
 
   TH2D *hTransform = SetupMatrixHist(parent1PDG, parent2PDG);
   
@@ -43,8 +46,11 @@ void GenerateTransformMatrix(const Int_t nFiles, Int_t)
     TTree *thermTree = (TTree*) inFile.Get("particles");
     assert(NULL != thermTree);
 
+    cout<<"Now using file "<<iFile<<endl;
+
     Int_t nThermEntries = thermTree->GetEntries();
     Int_t nextEntry = 0;
+    
 
     // Find lambdas and parents for each event, and bin in kstar
     while(nextEntry < nThermEntries) {
@@ -53,9 +59,9 @@ void GenerateTransformMatrix(const Int_t nFiles, Int_t)
       // will then be set to nextEntry.
       Int_t firstEntryInEvent = nextEntry;
       vector<Int_t> lambdaIDs  = GetIDsOfLambdas(parent1PDG, parent2PDG, thermTree, nextEntry);
-      vector<Int_t> parent1IDs = GetParentIDs(&lambdaIDs, parent1PDG, thermTree, firstEntryInEvent);
-      vector<Int_t> parent2IDs = GetParentIDs(&lambdaIDs, parent2PDG, thermTree, firstEntryInEvent);
-      FillTransformMatrix(hTransform, &parent1IDs, &parent2IDs, &lambdaIDs, thermTree);
+      vector<Int_t> parent1IDs = GetParentIDs(lambdaIDs, parent1PDG, thermTree, firstEntryInEvent);
+      vector<Int_t> parent2IDs = GetParentIDs(lambdaIDs, parent2PDG, thermTree, firstEntryInEvent);
+      // FillTransformMatrix(hTransform, &parent1IDs, &parent2IDs, &lambdaIDs, thermTree);
     }
   }
   
@@ -75,6 +81,8 @@ TH2D *SetupMatrixHist(Int_t parent1PDG, Int_t parent2PDG)
   // Setup the axis labels
   // Make the plot pretty
   // Take as inputs the pdg codes or axis labels 
+
+  cout<<"Setting up the transform matrix histogram.\n";
   
   TString part1Name = GetNameFromPDG(parent1PDG);
   TString part2Name = GetNameFromPDG(parent2PDG);
@@ -85,7 +93,7 @@ TH2D *SetupMatrixHist(Int_t parent1PDG, Int_t parent2PDG)
   Double_t maxKstar = 2.;
   TH2D *hTransform = new TH2D(histName, histName, 
 			      kstarBins, 0., maxKstar,
-			      kstarBins, 0. maxKstar);
+			      kstarBins, 0., maxKstar);
   TString xLabel = "k^{*}_{#Lambda#Lambda}";
   TString yLabel = "k^{*}_{#";
   yLabel += part1Name;
@@ -102,7 +110,7 @@ TH2D *SetupMatrixHist(Int_t parent1PDG, Int_t parent2PDG)
 TString GetNameFromPDG(Int_t pdgCode)
 {
   //Take a pdg code and return a TString of the particle's name
-  TString pdgName;
+  TString pdgName = "test";
   //...
   return pdgName;
 }
@@ -110,6 +118,7 @@ TString GetNameFromPDG(Int_t pdgCode)
 vector<TString> GetTFileNames(const Int_t nFiles)
 {
   // Use the number of files to generate a list of event file names
+  cout<<"Getting the TFile names of "<<nFiles<<" files\n";
   vector<TString> fileNames;
   
   for(Int_t i = 0; i < nFiles; i++){
@@ -129,6 +138,7 @@ vector<Int_t> GetIDsOfLambdas(const Int_t parent1PDG, const Int_t parent2PDG, co
   // Find daughters of lambdas/antilambdas.  Check if they pass cuts.
   // If they do, check if their parent lambda passes cuts.  Return
   // list of track IDs of lambdas that pass cuts.
+  cout<<"Using charged tracks to find lambda parent IDs\n";
 
   // Determine which of proton, antiproton, pi+, pi- we need
   vector<Int_t> daughterPDGs = DetermineRelevantDaughterPDGs(parent1PDG, parent2PDG);
@@ -148,30 +158,33 @@ vector<Int_t> GetIDsOfLambdas(const Int_t parent1PDG, const Int_t parent2PDG, co
   // Vector to store lambda/antilambda event IDs for daughters that
   // pass cuts
   vector<Int_t> lambdaCandidateIDs;
-
+  cout<<"The final entry is "<<finalEntry<<endl;
   //loop over all the particles in the event
   while(particleEntry->eventid == currentEventID)
   {
+    // cout<<"In event "<<particleEntry->eventid<<". Current entry is "<<nextEntry<<endl;
     const Int_t pid = particleEntry->pid;
     const Int_t parentPid = particleEntry->fatherpid;
     const Int_t parentID = particleEntry->fathereid;
-    
+    // cout<<"My pid is "<<pid<<endl;
     // If particle doesn't have a lambda/antilambda parent, ignore it
-    if((parentPid != parent1PDG) && (parentPid != parent2PDG)) continue;
-
-    //check if particle matches one of the relevant daughterPDGs
-    for(Int_t iPDG = 0; iPDG < daughterPDGs.size(); iPDG++)
+    if((parentPid == kLam) || (parentPid == kALam)) 
     {
-      if(pid == daughterPDGs[iPDG]) {
-	// if the daughter passes all cuts, add its parent ID to list
-	if(CheckIfPassDaugherCuts(particleEntry)) {
-	  lambdaCandidateIDs.push_back(parentID+startingEntry);
+      //check if particle matches one of the relevant daughterPDGs
+      for(Int_t iPDG = 0; iPDG < daughterPDGs.size(); iPDG++)
+      {
+	if(pid == daughterPDGs[iPDG]) {
+	  // if the daughter passes all cuts, add its parent ID to list
+	  if(CheckIfPassDaughterCuts(particleEntry)) {
+	    lambdaCandidateIDs.push_back(parentID+startingEntry);
+	    cout<<"Found a candidate"<<endl;
+	  }
+	  break;
 	}
-	break;
       }
     }
     nextEntry++;
-    if(finalEntry == nextEntry) break; //Reached the end of the file
+    if(finalEntry == nextEntry) {cout<<"Found end of file"<<endl; break;} //Reached the end of the file
     
     //Get the next entry
     nBytesInEntry = thermTree->GetEntry(nextEntry);
@@ -202,7 +215,7 @@ vector<Int_t> GetIDsOfLambdas(const Int_t parent1PDG, const Int_t parent2PDG, co
   } // End loop over V0 candidates
 
   delete particleEntry;
-  return lambdaIDs;
+  return finalV0IDs;
 }
 
   // Determine which of proton, antiproton, pi+, pi- we need
@@ -279,11 +292,13 @@ vector<Int_t> GetParentIDs(const vector<Int_t> &v0IDs, Int_t parentPDG, TTree *t
 {
   // Use the list of lambdas to find lambdas with the correct parent.
   // Save the parent IDs in the vector.
+  cout<<"Finding parents of lambdas\n";
+
 
   // Make a vector to hold parentIDs.  This will be the same size as the
   // LambdaID vector.  If the lambda doesn't have an appropriate parent,
   // just leave the entry as -1.  Otherwise, put in the parent's ID number
-  vector<Int_T> parentIDs(v0IDs.size(),-1);
+  vector<Int_t> parentIDs = (v0IDs.size(),-1);
 
   // Prepare to get particles from the TBranch
   ParticleCoor *particleEntry = new ParticleCoor;
@@ -338,5 +353,5 @@ Int_t GetElectroWeakPDG(Int_t index)
 
 void FillTransformMatrix(TH2D *hTransform, vector<Int_t> &parent1IDs, vector<Int_t> &parent2IDs, vector<Int_t> &lambdaIDs, TTree *thermTree);
 {
-
+  cout<<"Filling transform matrix\n";
 }
