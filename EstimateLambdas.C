@@ -719,7 +719,7 @@ bool CheckIfPassDaughterCuts(const ParticleCoor *particle, const int pid)
 
   // Check generic cuts
   if(particle->GetPt() < 0.16) return false;
-  if(abs(particle->GetEtaP()) > 0.8) return false;
+  if(fabs(particle->GetEtaP()) > 0.8) return false;
 
   // Check pid specific cuts
   if(pid == kProt) {
@@ -743,7 +743,7 @@ bool CheckIfPassLambdaCuts(const ParticleCoor *particle)
 {
   //Implement all sorts of reconstruction/detection cuts here
   double etaCut = 0.8;
-  if( abs( particle->GetEtaP() ) >= etaCut) return false;
+  if( fabs( particle->GetEtaP() ) >= etaCut) return false;
   if( particle->GetPt() < 0.4 ) return false;
 
   // //If we make it here, the particle passed all the cuts
