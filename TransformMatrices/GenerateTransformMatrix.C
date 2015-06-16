@@ -407,7 +407,6 @@ void FillTransformMatrix(TH2D *hTransform, vector<Int_t> &parent1IDs, vector<Int
 
     for(Int_t iPart2 = 0; iPart2 < parent2IDs.size(); iPart2++)
     {
-      cout<<"Parent2ID "<<iPart2<<":\t"<<parent1IDs[iPart2]<<endl;
       //Check to make sure we arent using the same parent particle
       if(iPart1 == iPart2) continue;
 
@@ -438,8 +437,23 @@ void FillTransformMatrix(TH2D *hTransform, vector<Int_t> &parent1IDs, vector<Int
 
 Double_t CalcKstar(ParticleCoor *part1, ParticleCoor *part2)
 {
-  Double_t kStar = 0.2;
-  //...
-  return kStar;
-  
+  // Calculate the relative momentum difference (kstar) for the pair
+
+  // Get the momenta and put them into a four-vector
+  Double_t p1[4];
+  Double_t p2[4];
+  part1->GetMomentum(&p1[3], &p1[0], &p1[1], &p1[2]);
+  part2->GetMomentum(&p2[3], &p2[0], &p2[1], &p2[2]);
+  TLorentzVector lv1(p1);
+  TLorentzVector lv2(p2);
+
+  // Now calculate kstar
+  TLorentzVector lvSum = lv1 + lv2; 
+  TLorentzVector lvDiff = lv1 - lv2;
+  TLorentzVector lvKstar = lvDiff - 
+    ((lvDiff*lvSum) / (lvSum*lvSum)) * lvSum;
+  lvKstar *= 0.5;
+  Double_t kstar = fabs(lvKstar.M());
+  cout<<"kstar is:\t"<<kstar<<endl;
+  return kstar;
 }
