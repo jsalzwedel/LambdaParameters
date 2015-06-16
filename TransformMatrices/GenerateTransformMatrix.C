@@ -89,10 +89,8 @@ TH2D *SetupMatrixHist(Int_t parent1PDG, Int_t parent2PDG)
   TH2D *hTransform = new TH2D(histName, histName, 
 			      kstarBins, 0., maxKstar,
 			      kstarBins, 0., maxKstar);
-
-  // ***************  Antiparticle labels ****************
-
-
+  
+  // Prepare the axis labels
   TString xLabel = "k^{*}_{";
   if(parent1PDG < 0) xLabel += "#bar{#Lambda}";
   else xLabel += "#Lambda";
@@ -100,9 +98,13 @@ TH2D *SetupMatrixHist(Int_t parent1PDG, Int_t parent2PDG)
   else xLabel += "#Lambda";
   xLabel += "}";
   TString yLabel = "k^{*}_{#";
+  if(parent1PDG < 0) yLabel += "bar{#";
   yLabel += part1Name;
+  if(parent1PDG < 0) yLabel += "}";
   yLabel += "#";
+  if(parent2PDG < 0) yLabel += "bar{#";
   yLabel += part2Name;
+  if(parent2PDG < 0) yLabel += "}";
   yLabel += "}";
 
   hTransform->GetXaxis()->SetTitle(xLabel);
@@ -114,8 +116,16 @@ TH2D *SetupMatrixHist(Int_t parent1PDG, Int_t parent2PDG)
 TString GetNameFromPDG(Int_t pdgCode)
 {
   //Take a pdg code and return a TString of the particle's name
-  TString pdgName = "test";
-  //...
+  TString pdgName;
+  // if(pdgCode < 0) pdgName += "#bar{";
+  
+  if(fabs(pdgCode) == kLam) pdgName += "Lambda";
+  else if(fabs(pdgCode) == kSigma) pdgName += "Sigma";
+  else if(fabs(pdgCode) == kXiC) pdgName += "Xi^{-}";
+  else if(fabs(pdgCode) == kXi0) pdgName += "Xi^{0}";
+  else if(fabs(pdgCode) == kOmega) pdgName += "Omega";
+
+  if(pdgCode < 0) pdgName += "}";
   return pdgName;
 }
 
@@ -227,7 +237,7 @@ vector<Int_t> GetIDsOfLambdas(const Int_t parent1PDG, const Int_t parent2PDG, co
     	//Now get the V0 and check if it passes cuts
     	nBytesInEntry = thermTree->GetEntry(v0ID);
     	assert(nBytesInEntry > 0);
-    	assert(particleEntry->pid == abs(kLam));
+    	assert(particleEntry->pid == fabs(kLam));
 	
     	if(CheckIfPassLambdaCuts(particleEntry, parent1PDG, parent2PDG)) {
     	  // cout<<"Candidate passed cut"<<endl;
@@ -267,7 +277,7 @@ bool CheckIfPassDaughterCuts(const ParticleCoor *particle)
 
   // Check generic cuts
   if(particle->GetPt() < 0.16) return false;
-  if(abs(particle->GetEtaP()) > 0.8) return false;
+  if(fabs(particle->GetEtaP()) > 0.8) return false;
   
   // Check pid specific cuts
   const Int_t pid = particle->pid;
@@ -289,7 +299,7 @@ bool CheckIfPassLambdaCuts(const ParticleCoor *particle, const Int_t parent1PDG,
 {
   //Implement all sorts of reconstruction/detection cuts here
   double etaCut = 0.8;
-  if( abs( particle->GetEtaP() ) >= etaCut) return false;
+  if( fabs( particle->GetEtaP() ) >= etaCut) return false;
   if( particle->GetPt() < 0.4 ) return false;
 
   // // Make sure the V0 has one of the parents that we care about
@@ -299,7 +309,7 @@ bool CheckIfPassLambdaCuts(const ParticleCoor *particle, const Int_t parent1PDG,
 
   // // If we want "primary" lambdas, check that we also accept
   // // lambdas coming from resonance decays
-  // if((abs(parent1PDG) == 3122) || (abs(parent2PDG) == 3122)){
+  // if((fabs(parent1PDG) == 3122) || (fabs(parent2PDG) == 3122)){
   //   //We want primary (anti)lambdas, and (anti)lambdas that come
   //   //from resonanaces.  Let's make sure this particle
   //   //doesn't come from some other source.
@@ -339,7 +349,7 @@ vector<Int_t> GetParentIDs(const vector<Int_t> &v0IDs, Int_t parentPDG, TTree *t
     Int_t currentID = v0IDs[iID];
     int nBytesInEntry = thermTree->GetEntry(currentID);
     assert(nBytesInEntry > 0);
-    assert(abs(particleEntry->pid) == kLam);
+    assert(fabs(particleEntry->pid) == kLam);
     // Check parentage
     const Int_t fatherPID = particleEntry->fatherpid;
     if(fatherPID == parentPDG) {
@@ -353,7 +363,7 @@ vector<Int_t> GetParentIDs(const vector<Int_t> &v0IDs, Int_t parentPDG, TTree *t
       bool isElectroWeakDecay = false;
       for(int iEMW = 0; iEMW < 4; iEMW++)
       {
-	if( abs(fatherPID) == abs(GetElectroWeakPDG(iEMW)) ) {
+	if( fabs(fatherPID) == fabs(GetElectroWeakPDG(iEMW)) ) {
 	  isElectroWeakDecay = true;
 	  break;
 	}
