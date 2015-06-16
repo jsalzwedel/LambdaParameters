@@ -29,12 +29,7 @@ void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2
   gInterpreter->AddIncludePath("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/include");
   gROOT->LoadMacro("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/src/ParticleCoor.cxx");
 
-  
-  // Int_t parent1PDG; //Pass this in somehow
-  // Int_t parent2PDG;
-
   TH2D *hTransform = SetupMatrixHist(parent1PDG, parent2PDG);
-  
   vector<TString> fileNames = GetTFileNames(nFiles);
 
   // Loop over each file
@@ -61,7 +56,7 @@ void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2
       vector<Int_t> lambdaIDs  = GetIDsOfLambdas(parent1PDG, parent2PDG, thermTree, nextEntry);
       vector<Int_t> parent1IDs = GetParentIDs(lambdaIDs, parent1PDG, thermTree, firstEntryInEvent);
       vector<Int_t> parent2IDs = GetParentIDs(lambdaIDs, parent2PDG, thermTree, firstEntryInEvent);
-      // FillTransformMatrix(hTransform, &parent1IDs, &parent2IDs, &lambdaIDs, thermTree);
+      FillTransformMatrix(hTransform, parent1IDs, parent2IDs, lambdaIDs, thermTree);
     }
   }
   
@@ -94,7 +89,16 @@ TH2D *SetupMatrixHist(Int_t parent1PDG, Int_t parent2PDG)
   TH2D *hTransform = new TH2D(histName, histName, 
 			      kstarBins, 0., maxKstar,
 			      kstarBins, 0., maxKstar);
-  TString xLabel = "k^{*}_{#Lambda#Lambda}";
+
+  // ***************  Antiparticle labels ****************
+
+
+  TString xLabel = "k^{*}_{";
+  if(parent1PDG < 0) xLabel += "#bar{#Lambda}";
+  else xLabel += "#Lambda";
+  if(parent2PDG < 0) xLabel += "#bar{#Lambda}";
+  else xLabel += "#Lambda";
+  xLabel += "}";
   TString yLabel = "k^{*}_{#";
   yLabel += part1Name;
   yLabel += "#";
@@ -147,6 +151,12 @@ vector<Int_t> GetIDsOfLambdas(const Int_t parent1PDG, const Int_t parent2PDG, co
   ParticleCoor *particleEntry = new ParticleCoor();
   TBranch *thermBranch = thermTree->GetBranch("particle");
   thermBranch->SetAddress(particleEntry);
+  // cout<<"Test1"<<endl;
+  // thermTree->GetEntry(1);
+  // cout<<particleEntry<<"\t"<<particleEntry->eid<<endl;
+  // thermTree->GetEntry(2);
+  // cout<<particleEntry<<"\t"<<particleEntry->eid<<endl;
+  // cout<<"Test2"<<endl;
 
   //Get first particle in this event
   const Int_t startingEntry = nextEntry;
@@ -367,7 +377,69 @@ Int_t GetElectroWeakPDG(Int_t index)
 }
 
 
-void FillTransformMatrix(TH2D *hTransform, vector<Int_t> &parent1IDs, vector<Int_t> &parent2IDs, vector<Int_t> &lambdaIDs, TTree *thermTree);
+void FillTransformMatrix(TH2D *hTransform, vector<Int_t> &parent1IDs, vector<Int_t> &parent2IDs, vector<Int_t> &lambdaIDs, TTree *thermTree)
 {
   cout<<"Filling transform matrix\n";
+
+  // Prepare to get particles from the TBranch
+  ParticleCoor *parent1 = new ParticleCoor;
+  ParticleCoor *parent2 = new ParticleCoor;
+  ParticleCoor *daughter1 = new ParticleCoor;
+  ParticleCoor *daughter2 = new ParticleCoor;
+
+  TBranch *thermBranch = thermTree->GetBranch("particle");
+    // thermBranch->SetAddress(particleEntry);
+  
+  // Loop over both sets of parents and make pairs
+  for(Int_t iPart1 = 0; iPart1 < parent1IDs.size(); iPart1++)
+  {
+    // Get the parent particle
+    Int_t parID1 = parent1IDs[iPart1];
+    if(parID1 == -1) continue; 
+    thermBranch->SetAddress(parent1);
+    assert(thermTree->GetEntry(parID1) > 0);
+
+    // Get the daughter particle
+    Int_t dauID1 = lambdaIDs[iPart1];
+    thermBranch->SetAddress(daughter1);
+    assert(thermTree->GetEntry(dauID1) > 0);
+    
+
+    for(Int_t iPart2 = 0; iPart2 < parent2IDs.size(); iPart2++)
+    {
+      cout<<"Parent2ID "<<iPart2<<":\t"<<parent1IDs[iPart2]<<endl;
+      //Check to make sure we arent using the same parent particle
+      if(iPart1 == iPart2) continue;
+
+      // Get the parent particle
+      Int_t parID2 = parent2IDs[iPart2];
+      if(parID2 == -1) continue; 
+      thermBranch->SetAddress(parent2);
+      assert(thermTree->GetEntry(parID2) > 0);
+
+      // Get the daughter particle
+      Int_t dauID2 = lambdaIDs[iPart2];
+      thermBranch->SetAddress(daughter2);
+      assert(thermTree->GetEntry(dauID2) > 0);
+
+      // We should not have the same daughter or parent IDs
+      assert(dauID1 != dauID2);
+      assert(parID1 != parID2);
+      
+      // Calculate kstar and fill the histogram
+      Double_t kstarParents = CalcKstar(parent1, parent2);
+      Double_t kstarDaughters = CalcKstar(daughter1, daughter2);
+      hTransform->Fill(kstarDaughters, kstarParents);
+    }
+
+  }
+  
+}
+
+Double_t CalcKstar(ParticleCoor *part1, ParticleCoor *part2)
+{
+  Double_t kStar = 0.2;
+  //...
+  return kStar;
+  
 }
