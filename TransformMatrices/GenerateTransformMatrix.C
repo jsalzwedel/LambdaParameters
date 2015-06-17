@@ -35,6 +35,7 @@ void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2
   // Loop over each file
   for (Int_t iFile = 0; iFile < nFiles; iFile++)
   {
+    
     // Read in the file and get the particle branch
     TFile inFile(fileNames[iFile], "read");
     assert(NULL != &inFile);
@@ -79,8 +80,8 @@ TH2D *SetupMatrixHist(Int_t parent1PDG, Int_t parent2PDG)
 
   cout<<"Setting up the transform matrix histogram.\n";
   
-  TString part1Name = GetNameFromPDG(parent1PDG);
-  TString part2Name = GetNameFromPDG(parent2PDG);
+  TString part1Name = GetNameFromPDG(parent1PDG, true);
+  TString part2Name = GetNameFromPDG(parent2PDG, true);
   TString histName = "TransformMatrix";
   histName += part1Name;
   histName += part2Name;
@@ -98,13 +99,9 @@ TH2D *SetupMatrixHist(Int_t parent1PDG, Int_t parent2PDG)
   else xLabel += "#Lambda";
   xLabel += "}";
   TString yLabel = "k^{*}_{#";
-  if(parent1PDG < 0) yLabel += "bar{#";
-  yLabel += part1Name;
-  if(parent1PDG < 0) yLabel += "}";
+  yLabel += GetNameFromPDG(parent1PDG,false);
   yLabel += "#";
-  if(parent2PDG < 0) yLabel += "bar{#";
-  yLabel += part2Name;
-  if(parent2PDG < 0) yLabel += "}";
+  yLabel += GetNameFromPDG(parent2PDG,false);
   yLabel += "}";
 
   hTransform->GetXaxis()->SetTitle(xLabel);
@@ -113,19 +110,19 @@ TH2D *SetupMatrixHist(Int_t parent1PDG, Int_t parent2PDG)
   return hTransform;
 }
 
-TString GetNameFromPDG(Int_t pdgCode)
+TString GetNameFromPDG(Int_t pdgCode, Bool_t isHistTitle)
 {
   //Take a pdg code and return a TString of the particle's name
-  TString pdgName;
-  // if(pdgCode < 0) pdgName += "#bar{";
-  
+  TString pdgName = "";
+  if((pdgCode < 0) && isHistTitle) pdgName += "Anti";
+  else if(pdgCode < 0) pdgName += "bar{#";
   if(fabs(pdgCode) == kLam) pdgName += "Lambda";
   else if(fabs(pdgCode) == kSigma) pdgName += "Sigma";
   else if(fabs(pdgCode) == kXiC) pdgName += "Xi^{-}";
   else if(fabs(pdgCode) == kXi0) pdgName += "Xi^{0}";
   else if(fabs(pdgCode) == kOmega) pdgName += "Omega";
 
-  if(pdgCode < 0) pdgName += "}";
+  if((pdgCode < 0) && !isHistTitle) pdgName += "}";
   return pdgName;
 }
 
@@ -178,7 +175,7 @@ vector<Int_t> GetIDsOfLambdas(const Int_t parent1PDG, const Int_t parent2PDG, co
   // Vector to store lambda/antilambda event IDs for daughters that
   // pass cuts
   vector<Int_t> lambdaCandidateIDs;
-  cout<<"This event is "<<currentEventID<<endl;
+  // cout<<"This event is "<<currentEventID<<endl;
   // cout<<"The final entry is "<<finalEntry<<endl;
   //loop over all the particles in the event
   
@@ -199,6 +196,7 @@ vector<Int_t> GetIDsOfLambdas(const Int_t parent1PDG, const Int_t parent2PDG, co
 	  // if the daughter passes all cuts, add its parent ID to list
 	  if(CheckIfPassDaughterCuts(particleEntry)) {
 	    lambdaCandidateIDs.push_back(parentID+startingEntry);
+	    // cout<<"Pid:\t"<<pid<<"\t\tparentPid:\t"<<parentPid<<"\t\tParentID:\t"<<parentID<<endl;
 	    // cout<<"Found a candidate"<<endl;
 	  }
 	  break;
@@ -217,7 +215,7 @@ vector<Int_t> GetIDsOfLambdas(const Int_t parent1PDG, const Int_t parent2PDG, co
  // Vector to store IDs of (anti)lambdas that pass all cuts
   vector<Int_t> finalV0IDs;
   Int_t nCandidates = lambdaCandidateIDs.size();
-  cout<<"Number of candidates:\t"<<nCandidates<<endl;
+  cout<<"Number of daughters found:\t"<<nCandidates<<endl;
   for(Int_t iV01=0; iV01 < nCandidates; iV01++)
   {
     // Check which V0 entries appear twice in the list (once for
@@ -236,8 +234,13 @@ vector<Int_t> GetIDsOfLambdas(const Int_t parent1PDG, const Int_t parent2PDG, co
       if(v0ID == v0ID2){
     	//Now get the V0 and check if it passes cuts
     	nBytesInEntry = thermTree->GetEntry(v0ID);
+
+	// cout<<"V0ID:\t"<<v0ID<<endl;
+	// cout<<"Particle's pid:\t"<<particleEntry->pid<<"\tID:\t"<<particleEntry->eid<<endl;
+	// cout<<"Bytes In Entry:\t"<<nBytesInEntry<<endl;
     	assert(nBytesInEntry > 0);
-    	assert(particleEntry->pid == fabs(kLam));
+	// cout<<"fabs(pid) = "<<
+	assert(fabs(particleEntry->pid) == kLam);
 	
     	if(CheckIfPassLambdaCuts(particleEntry, parent1PDG, parent2PDG)) {
     	  // cout<<"Candidate passed cut"<<endl;
@@ -327,8 +330,6 @@ vector<Int_t> GetParentIDs(const vector<Int_t> &v0IDs, Int_t parentPDG, TTree *t
 {
   // Use the list of lambdas to find lambdas with the correct parent.
   // Save the parent IDs in the vector.
-  cout<<"Finding parents of lambdas\n";
-
 
   // Make a vector to hold parentIDs.  This will be the same size as the
   // LambdaID vector.  If the lambda doesn't have an appropriate parent,
@@ -343,7 +344,7 @@ vector<Int_t> GetParentIDs(const vector<Int_t> &v0IDs, Int_t parentPDG, TTree *t
   // Loop over all the lambdas and find the lambdas with a parent
   // that matches parentPDG
   Int_t nV0s = v0IDs.size();
-  cout<<"Found "<<nV0s<<" in the last step"<<endl;
+  // cout<<"Found "<<nV0s<<" in the last step"<<endl;
   for(Int_t iID = 0; iID < nV0s; iID++){
     // Get a V0 and check that it exists and is a (anti)lambda
     Int_t currentID = v0IDs[iID];
@@ -464,6 +465,6 @@ Double_t CalcKstar(ParticleCoor *part1, ParticleCoor *part2)
     ((lvDiff*lvSum) / (lvSum*lvSum)) * lvSum;
   lvKstar *= 0.5;
   Double_t kstar = fabs(lvKstar.M());
-  cout<<"kstar is:\t"<<kstar<<endl;
+  // cout<<"kstar is:\t"<<kstar<<endl;
   return kstar;
 }
