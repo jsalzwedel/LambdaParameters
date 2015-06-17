@@ -20,6 +20,8 @@ class ParticleCoor;
 //This fixes it.
 #define _CXX_VER_ "g++(4.9.1)" 
 
+Bool_t debug = kFALSE;
+
 void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2PDG)
 {
   // Main function.  Specify how many input files to use and this
@@ -56,7 +58,9 @@ void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2
       Int_t firstEntryInEvent = nextEntry;
       vector<Int_t> lambdaIDs  = GetIDsOfLambdas(parent1PDG, parent2PDG, thermTree, nextEntry);
       vector<Int_t> parent1IDs = GetParentIDs(lambdaIDs, parent1PDG, thermTree, firstEntryInEvent);
+      if(debug) cout<<"# of 1st particle\t"<<parent1IDs.size()<<endl;
       vector<Int_t> parent2IDs = GetParentIDs(lambdaIDs, parent2PDG, thermTree, firstEntryInEvent);
+      if(debug) cout<<"# of 2nd particle\t"<<parent2IDs.size()<<endl;
       FillTransformMatrix(hTransform, parent1IDs, parent2IDs, lambdaIDs, thermTree);
     }
   }
@@ -215,7 +219,7 @@ vector<Int_t> GetIDsOfLambdas(const Int_t parent1PDG, const Int_t parent2PDG, co
  // Vector to store IDs of (anti)lambdas that pass all cuts
   vector<Int_t> finalV0IDs;
   Int_t nCandidates = lambdaCandidateIDs.size();
-  cout<<"Number of daughters found:\t"<<nCandidates<<endl;
+  if(debug) cout<<"Number of daughters found:\t"<<nCandidates<<endl;
   for(Int_t iV01=0; iV01 < nCandidates; iV01++)
   {
     // Check which V0 entries appear twice in the list (once for
@@ -223,15 +227,19 @@ vector<Int_t> GetIDsOfLambdas(const Int_t parent1PDG, const Int_t parent2PDG, co
     // If it appears twice AND it passes cuts, add it to final V0
     // list.
     const Int_t v0ID = lambdaCandidateIDs[iV01];
-    // cout<<iV01<<"\t"<<v0ID<<endl;
-    // const Int_t v0ID2 = lambdaCandidateIDs[iV01+1];
-    // cout<<iV01<<"\t"<<iV01+1<<endl;
+
+    //debug
+    Bool_t foundMate = kFALSE;
+    // end debug
+
     for(Int_t iV02 = iV01+1; iV02 < nCandidates; iV02++)
     {
       const Int_t v0ID2 = lambdaCandidateIDs[iV02];
       // cout<<"\t\t"<<iV02<<"\t"<<v0ID2<<endl;
       // cout<<iV01<<"\t"<<iV02<<endl;
       if(v0ID == v0ID2){
+	assert(!foundMate);
+	foundMate = kTRUE;
     	//Now get the V0 and check if it passes cuts
     	nBytesInEntry = thermTree->GetEntry(v0ID);
 
@@ -251,6 +259,12 @@ vector<Int_t> GetIDsOfLambdas(const Int_t parent1PDG, const Int_t parent2PDG, co
       }
     }
   } // End loop over V0 candidates
+
+  if(debug){
+    for(int i = 0; i < finalV0IDs.size(); i++) {
+      cout<<"ID:\t"<<finalV0IDs[i]<<endl;
+    } 
+  }
 
   delete particleEntry;
   return finalV0IDs;
@@ -334,7 +348,7 @@ vector<Int_t> GetParentIDs(const vector<Int_t> &v0IDs, Int_t parentPDG, TTree *t
   // Make a vector to hold parentIDs.  This will be the same size as the
   // LambdaID vector.  If the lambda doesn't have an appropriate parent,
   // just leave the entry as -1.  Otherwise, put in the parent's ID number
-  vector<Int_t> parentIDs (v0IDs.size(),-1);
+  vector<Int_t> parentIDs (v0IDs.size(),-555);
 
   // Prepare to get particles from the TBranch
   ParticleCoor *particleEntry = new ParticleCoor;
@@ -353,9 +367,26 @@ vector<Int_t> GetParentIDs(const vector<Int_t> &v0IDs, Int_t parentPDG, TTree *t
     assert(fabs(particleEntry->pid) == kLam);
     // Check parentage
     const Int_t fatherPID = particleEntry->fatherpid;
+    if(debug) cout<<"FatherPID is \t"<<fatherPID<<". FatherEID is\t"<<particleEntry->fathereid<<endl;
     if(fatherPID == parentPDG) {
       // We found one of the parents we want.  Save its absolute ID.
-      parentIDs[iID] = particleEntry->fathereid + firstEventEntry;
+      if(-1 == particleEntry->fathereid) {
+	// a fathereid of -1 means that the daughter was actually a primary particle
+	parentIDs[iID] = currentID;
+	if(debug) {
+	  cout<<"For ID "<<currentID<<". I am a "<<particleEntry->pid
+	      <<". My parent's ID is\t"<<parentIDs[iID]
+	      <<". My parent's pid is\t"<<fatherPID<<"\tPrimary"<<endl;
+	}
+      }
+      else {
+	parentIDs[iID] = particleEntry->fathereid + firstEventEntry;
+	if(debug) {
+	  cout<<"For ID "<<currentID<<". I am a "<<particleEntry->pid
+	      <<". My parent's ID is\t"<<parentIDs[iID]
+	      <<". My parent's pid is\t"<<fatherPID<<"\tEMWeak"<<endl;
+	}
+      }
     }
     // Special case where we want "primary" lambdas.  Here, we also
     // accept lambdas where the parent is a short-lived resonance.
@@ -372,9 +403,21 @@ vector<Int_t> GetParentIDs(const vector<Int_t> &v0IDs, Int_t parentPDG, TTree *t
       if(!isElectroWeakDecay) {
 	// This came from a resonance.  Use the lambda's eid.
 	parentIDs[iID] = particleEntry->eid + firstEventEntry;
+	if(debug){
+	  cout<<"For ID "<<currentID<<". I am a "<<particleEntry->pid
+	      <<". My parent's ID is\t"<<parentIDs[iID]
+	      <<". My parent's pid is\t"<<fatherPID<<"\tResonance"<<endl;
+	}
       }
     }
   } // end loop over v0 candidates
+
+  //debug
+  if(debug){
+    for(int i = 0; i < parentIDs.size(); i++) {
+      cout<<"ID:\t"<<parentIDs[i]<<endl;
+    } 
+  }
   return parentIDs;
 }
 
@@ -406,7 +449,7 @@ void FillTransformMatrix(TH2D *hTransform, vector<Int_t> &parent1IDs, vector<Int
   {
     // Get the parent particle
     Int_t parID1 = parent1IDs[iPart1];
-    if(parID1 == -1) continue; 
+    if(parID1 == -555) continue; 
     thermBranch->SetAddress(parent1);
     assert(thermTree->GetEntry(parID1) > 0);
 
@@ -423,7 +466,7 @@ void FillTransformMatrix(TH2D *hTransform, vector<Int_t> &parent1IDs, vector<Int
 
       // Get the parent particle
       Int_t parID2 = parent2IDs[iPart2];
-      if(parID2 == -1) continue; 
+      if(parID2 == -555) continue; 
       thermBranch->SetAddress(parent2);
       assert(thermTree->GetEntry(parID2) > 0);
 
