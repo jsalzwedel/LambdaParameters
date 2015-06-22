@@ -7,6 +7,8 @@
 //
 //********************************************************************
 
+#include <vector>
+
 enum ParticlePDG {kProt   = 2212,  kAntiProt = -2212, 
 		  kPiPlus = 211,   kPiMinus  = -211, 
 		  kLam    = 3122,  kALam     = -3122,
@@ -33,6 +35,7 @@ void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2
 
 
   vector<TString> fileNames = GetTFileNames(nFiles);
+  gInterpreter->GenerateDictionary("vector<vector<Int_t> >","vector");
   vector< vector<Int_t> > parent1IDs;
   vector< vector<Int_t> > parent2IDs;
   vector< vector<Int_t> > lambdaIDs;
@@ -65,8 +68,8 @@ void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2
       parent1IDs.push_back(GetParentIDs(lambdaIDs.back(), parent1PDG, thermTree, firstEntryInEvent));
       parent2IDs.push_back(GetParentIDs(lambdaIDs.back(), parent2PDG, thermTree, firstEntryInEvent));
       if(debug) {
-	cout<<"# of 1st particle\t"<<parent1IDs.back().size()<<endl;
-	cout<<"# of 2nd particle\t"<<parent2IDs.back().size()<<endl;
+  	cout<<"# of 1st particle\t"<<parent1IDs.back().size()<<endl;
+  	cout<<"# of 2nd particle\t"<<parent2IDs.back().size()<<endl;
       }
     }
     if(debug) cout<<"Events: \t"<<nEvents<<endl;
