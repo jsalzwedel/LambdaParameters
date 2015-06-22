@@ -31,10 +31,14 @@ void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2
   gInterpreter->AddIncludePath("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/include");
   gROOT->LoadMacro("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/src/ParticleCoor.cxx");
 
-  TH2D *hTransform = SetupMatrixHist(parent1PDG, parent2PDG);
-  vector<TString> fileNames = GetTFileNames(nFiles);
 
-  // Loop over each file
+  vector<TString> fileNames = GetTFileNames(nFiles);
+  vector< vector<Int_t> > parent1IDs;
+  vector< vector<Int_t> > parent2IDs;
+  vector< vector<Int_t> > lambdaIDs;
+
+
+  // Loop over each file and gather the track IDs
   for (Int_t iFile = 0; iFile < nFiles; iFile++)
   {
     
@@ -49,21 +53,50 @@ void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2
     Int_t nThermEntries = thermTree->GetEntries();
     Int_t nextEntry = 0;
     
-
+    Int_t nEvents = 0;
     // Find lambdas and parents for each event, and bin in kstar
     while(nextEntry < nThermEntries) {
+      if(debug) nEvents++;
       // GetIDsOfLambdas will run through each particle starting from 
       // nextEntry and ending when it hits a new event.  That entry 
       // will then be set to nextEntry.
       Int_t firstEntryInEvent = nextEntry;
-      vector<Int_t> lambdaIDs  = GetIDsOfLambdas(parent1PDG, parent2PDG, thermTree, nextEntry);
-      vector<Int_t> parent1IDs = GetParentIDs(lambdaIDs, parent1PDG, thermTree, firstEntryInEvent);
-      if(debug) cout<<"# of 1st particle\t"<<parent1IDs.size()<<endl;
-      vector<Int_t> parent2IDs = GetParentIDs(lambdaIDs, parent2PDG, thermTree, firstEntryInEvent);
-      if(debug) cout<<"# of 2nd particle\t"<<parent2IDs.size()<<endl;
-      FillTransformMatrix(hTransform, parent1IDs, parent2IDs, lambdaIDs, thermTree);
+      lambdaIDs.push_back(GetIDsOfLambdas(parent1PDG, parent2PDG, thermTree, nextEntry));
+      parent1IDs.push_back(GetParentIDs(lambdaIDs.back(), parent1PDG, thermTree, firstEntryInEvent));
+      parent2IDs.push_back(GetParentIDs(lambdaIDs.back(), parent2PDG, thermTree, firstEntryInEvent));
+      if(debug) {
+	cout<<"# of 1st particle\t"<<parent1IDs.back().size()<<endl;
+	cout<<"# of 2nd particle\t"<<parent2IDs.back().size()<<endl;
+      }
+    }
+    if(debug) cout<<"Events: \t"<<nEvents<<endl;
+  }
+
+  
+  // Loop over the files and use the track IDs to calculate kstar and
+  // fill the transform matrix.  We use event mixing for more
+  // statistics.
+  TH2D *hTransform = SetupMatrixHist(parent1PDG, parent2PDG);
+  for (Int_t iFile1 = 0; iFile1 < nFiles; iFile1++)
+  {
+    // Read in the file and get the particle branch
+    TFile inFile1(fileNames[iFile1], "read");
+    assert(NULL != &inFile1);
+    TTree *thermTree1 = (TTree*) inFile1.Get("particles");
+    assert(NULL != thermTree1);
+
+    for (Int_t iFile2 = iFile1; iFile2 < nFiles; iFile2++)
+    {
+      TFile inFile2(fileNames[iFile2], "read");
+      assert(NULL != &inFile2);
+      TTree *thermTree2 = (TTree*) inFile2.Get("particles");
+      assert(NULL != thermTree2);
+      
+      FillTransformMatrix(hTransform, parent1IDs, parent2IDs, lambdaIDs, iFile1, iFile2, thermTree1, thermTree2);
     }
   }
+
+
   
   TString outFileName = "TransformMatrices.root";
   TFile outFile(outFileName, "update");
