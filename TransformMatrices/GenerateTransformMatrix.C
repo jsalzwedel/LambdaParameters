@@ -150,65 +150,68 @@ vector<TString> GetTFileNames(const Int_t nFiles)
 
 vector<Int_t> GetIDsOfLambdas(const Int_t parent1PDG, const Int_t parent2PDG, const TTree *thermTree, Int_t &nextEntry)
 {
-  // Find daughters of lambdas/antilambdas.  Check if they pass cuts.
-  // If they do, check if their parent lambda passes cuts.  Return
-  // list of track IDs of lambdas that pass cuts.
-  cout<<"Using charged tracks to find lambda parent IDs\n";
+   // Find daughters of lambdas/antilambdas.  Check if they pass cuts.
+   // If they do, check if their parent lambda passes cuts.  Return
+   // list of track IDs of lambdas that pass cuts.
+   if(debug) cout<<"Using charged tracks to find lambda parent IDs\n";
 
-  // Determine which of proton, antiproton, pi+, pi- we need
-  vector<Int_t> daughterPDGs = DetermineRelevantDaughterPDGs(parent1PDG, parent2PDG);
+   // Determine which of proton, antiproton, pi+, pi- we need
+   vector<Int_t> daughterPDGs = DetermineRelevantDaughterPDGs(parent1PDG, parent2PDG);
 
-  // Get the particle branch
-  ParticleCoor *particleEntry = new ParticleCoor();
-  TBranch *thermBranch = thermTree->GetBranch("particle");
-  thermBranch->SetAddress(particleEntry);
-  // cout<<"Test1"<<endl;
-  // thermTree->GetEntry(1);
-  // cout<<particleEntry<<"\t"<<particleEntry->eid<<endl;
-  // thermTree->GetEntry(2);
-  // cout<<particleEntry<<"\t"<<particleEntry->eid<<endl;
-  // cout<<"Test2"<<endl;
+   // Get the particle branch
+   ParticleCoor *particleEntry = new ParticleCoor();
+   TBranch *thermBranch = thermTree->GetBranch("particle");
+   thermBranch->SetAddress(particleEntry);
+   // cout<<"Test1"<<endl;
+   // thermTree->GetEntry(1);
+   // cout<<particleEntry<<"\t"<<particleEntry->eid<<endl;
+   // thermTree->GetEntry(2);
+   // cout<<particleEntry<<"\t"<<particleEntry->eid<<endl;
+   // cout<<"Test2"<<endl;
 
-  //Get first particle in this event
-  const Int_t startingEntry = nextEntry;
-  const Int_t finalEntry = thermTree->GetEntries();
-  int nBytesInEntry = thermTree->GetEntry(startingEntry);
-  assert(nBytesInEntry > 0);
-  UInt_t currentEventID = particleEntry->eventid;
-  
-  // Vector to store lambda/antilambda event IDs for daughters that
-  // pass cuts
-  vector<Int_t> lambdaCandidateIDs;
-  // cout<<"This event is "<<currentEventID<<endl;
-  // cout<<"The final entry is "<<finalEntry<<endl;
-  //loop over all the particles in the event
-  
-  while(particleEntry->eventid == currentEventID)
-  {
-    // cout<<"In event "<<particleEntry->eventid<<". Current entry is "<<nextEntry<<endl;
-    const Int_t pid = particleEntry->pid;
-    const Int_t parentPid = particleEntry->fatherpid;
-    const Int_t parentID = particleEntry->fathereid;
-    // cout<<"My pid is "<<pid<<endl;
-    // If particle doesn't have a lambda/antilambda parent, ignore it
-    if((parentPid == kLam) || (parentPid == kALam)) 
-    {
-      //check if particle matches one of the relevant daughterPDGs
-      for(Int_t iPDG = 0; iPDG < daughterPDGs.size(); iPDG++)
-      {
-	if(pid == daughterPDGs[iPDG]) {
-	  // if the daughter passes all cuts, add its parent ID to list
-	  if(CheckIfPassDaughterCuts(particleEntry)) {
-	    lambdaCandidateIDs.push_back(parentID+startingEntry);
-	    // cout<<"Pid:\t"<<pid<<"\t\tparentPid:\t"<<parentPid<<"\t\tParentID:\t"<<parentID<<endl;
-	    // cout<<"Found a candidate"<<endl;
-	  }
-	  break;
-	}
-      }
-    }
-    nextEntry++;
-    if(finalEntry == nextEntry) {cout<<"Found end of file"<<endl; break;} //Reached the end of the file
+   //Get first particle in this event
+   const Int_t startingEntry = nextEntry;
+   const Int_t finalEntry = thermTree->GetEntries();
+   int nBytesInEntry = thermTree->GetEntry(startingEntry);
+   assert(nBytesInEntry > 0);
+   UInt_t currentEventID = particleEntry->eventid;
+
+   // Vector to store lambda/antilambda event IDs for daughters that
+   // pass cuts
+   vector<Int_t> lambdaCandidateIDs;
+   // cout<<"This event is "<<currentEventID<<endl;
+   // cout<<"The final entry is "<<finalEntry<<endl;
+   //loop over all the particles in the event
+
+   while(particleEntry->eventid == currentEventID)
+   {
+     // cout<<"In event "<<particleEntry->eventid<<". Current entry is "<<nextEntry<<endl;
+     const Int_t pid = particleEntry->pid;
+     const Int_t parentPid = particleEntry->fatherpid;
+     const Int_t parentID = particleEntry->fathereid;
+     // cout<<"My pid is "<<pid<<endl;
+     // If particle doesn't have a lambda/antilambda parent, ignore it
+     if((parentPid == kLam) || (parentPid == kALam)) 
+     {
+       //check if particle matches one of the relevant daughterPDGs
+       for(Int_t iPDG = 0; iPDG < daughterPDGs.size(); iPDG++)
+       {
+	 if(pid == daughterPDGs[iPDG]) {
+	   // if the daughter passes all cuts, add its parent ID to list
+	   if(CheckIfPassDaughterCuts(particleEntry)) {
+	     lambdaCandidateIDs.push_back(parentID+startingEntry);
+	     // cout<<"Pid:\t"<<pid<<"\t\tparentPid:\t"<<parentPid<<"\t\tParentID:\t"<<parentID<<endl;
+	     // cout<<"Found a candidate"<<endl;
+	   }
+	   break;
+	 }
+       }
+     }
+     nextEntry++;
+     if(finalEntry == nextEntry) {
+       if(debug) cout<<"Found end of file"<<endl;
+       break;
+     } //Reached the end of the file
     
     //Get the next entry
     nBytesInEntry = thermTree->GetEntry(nextEntry);
@@ -433,7 +436,7 @@ Int_t GetElectroWeakPDG(Int_t index)
 
 void FillTransformMatrix(TH2D *hTransform, vector<Int_t> &parent1IDs, vector<Int_t> &parent2IDs, vector<Int_t> &lambdaIDs, TTree *thermTree)
 {
-  cout<<"Filling transform matrix\n";
+  if(debug) cout<<"Filling transform matrix\n";
 
   // Prepare to get particles from the TBranch
   ParticleCoor *parent1 = new ParticleCoor;
