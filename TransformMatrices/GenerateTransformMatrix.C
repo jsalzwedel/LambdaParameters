@@ -57,56 +57,74 @@ void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2
     Int_t nextEntry = 0;
     
     Int_t nEvents = 0;
+    // These will hold all the IDs in a file
+    vector<Int_t> parent1IDsFile;
+    vector<Int_t> parent2IDsFile;
+    vector<Int_t> lambdaIDsFile;
     // Find lambdas and parents for each event, and bin in kstar
     while(nextEntry < nThermEntries) {
-      if(debug) nEvents++;
+      nEvents++;
       // GetIDsOfLambdas will run through each particle starting from 
       // nextEntry and ending when it hits a new event.  That entry 
       // will then be set to nextEntry.
       Int_t firstEntryInEvent = nextEntry;
-      lambdaIDs.push_back(GetIDsOfLambdas(parent1PDG, parent2PDG, thermTree, nextEntry));
-      parent1IDs.push_back(GetParentIDs(lambdaIDs.back(), parent1PDG, thermTree, firstEntryInEvent));
-      parent2IDs.push_back(GetParentIDs(lambdaIDs.back(), parent2PDG, thermTree, firstEntryInEvent));
+
+      // Get all the IDs in an event
+      vector<Int_t> lambdaIDsEvent = GetIDsOfLambdas(parent1PDG, parent2PDG, thermTree, nextEntry);
+      vector<Int_t> parent1IDsEvent = GetParentIDs(lambdaIDsEvent, parent1PDG, thermTree, firstEntryInEvent);
+      vector<Int_t> parent2IDsEvent = GetParentIDs(lambdaIDsEvent, parent2PDG, thermTree, firstEntryInEvent);
+      
+      // Append the event IDs into the file IDs list
+      lambdaIDsFile.insert(lambdaIDsFile.end(), lambdaIDsEvent.begin(), lambdaIDsEvent.end());
+      parent1IDsFile.insert(parent1IDsFile.end(), parent1IDsEvent.begin(), parent1IDsEvent.end());
+      parent2IDsFile.insert(parent2IDsFile.end(), parent2IDsEvent.begin(), parent2IDsEvent.end());
       if(debug) {
-  	cout<<"# of 1st particle\t"<<parent1IDs.back().size()<<endl;
-  	cout<<"# of 2nd particle\t"<<parent2IDs.back().size()<<endl;
+  	cout<<"# of 1st particle\t"<<parent1IDsEvent.size()<<endl;
+  	cout<<"# of 2nd particle\t"<<parent2IDsEvent.size()<<endl;
       }
     }
     if(debug) cout<<"Events: \t"<<nEvents<<endl;
+    
+    // Add the file IDs vector to the list
+    lambdaIDs.push_back(lambdaIDsFile);
+    parent1IDs.push_back(parent1IDsFile);
+    parent2IDs.push_back(parent2IDsFile);
+
+    assert(lambdaIDs.size() == iFile+1);
   }
 
   
-  // Loop over the files and use the track IDs to calculate kstar and
-  // fill the transform matrix.  We use event mixing for more
-  // statistics.
-  TH2D *hTransform = SetupMatrixHist(parent1PDG, parent2PDG);
-  for (Int_t iFile1 = 0; iFile1 < nFiles; iFile1++)
-  {
-    // Read in the file and get the particle branch
-    TFile inFile1(fileNames[iFile1], "read");
-    assert(NULL != &inFile1);
-    TTree *thermTree1 = (TTree*) inFile1.Get("particles");
-    assert(NULL != thermTree1);
+  // // Loop over the files and use the track IDs to calculate kstar and
+  // // fill the transform matrix.  We use event mixing for more
+  // // statistics.
+  // TH2D *hTransform = SetupMatrixHist(parent1PDG, parent2PDG);
+  // for (Int_t iFile1 = 0; iFile1 < nFiles; iFile1++)
+  // {
+  //   // Read in the file and get the particle branch
+  //   TFile inFile1(fileNames[iFile1], "read");
+  //   assert(NULL != &inFile1);
+  //   TTree *thermTree1 = (TTree*) inFile1.Get("particles");
+  //   assert(NULL != thermTree1);
 
-    for (Int_t iFile2 = iFile1; iFile2 < nFiles; iFile2++)
-    {
-      TFile inFile2(fileNames[iFile2], "read");
-      assert(NULL != &inFile2);
-      TTree *thermTree2 = (TTree*) inFile2.Get("particles");
-      assert(NULL != thermTree2);
+  //   for (Int_t iFile2 = iFile1; iFile2 < nFiles; iFile2++)
+  //   {
+  //     TFile inFile2(fileNames[iFile2], "read");
+  //     assert(NULL != &inFile2);
+  //     TTree *thermTree2 = (TTree*) inFile2.Get("particles");
+  //     assert(NULL != thermTree2);
       
-      FillTransformMatrix(hTransform, parent1IDs, parent2IDs, lambdaIDs, iFile1, iFile2, thermTree1, thermTree2);
-    }
-  }
+  //     FillTransformMatrix(hTransform, parent1IDs, parent2IDs, lambdaIDs, iFile1, iFile2, thermTree1, thermTree2);
+  //   }
+  // }
 
 
   
-  TString outFileName = "TransformMatrices.root";
-  TFile outFile(outFileName, "update");
-  outFile.cd();
-  hTransform->Write(0,TObject::kOverwrite);
-  cout<<"Transform matrix "<<hTransform->GetName()
-      <<" written to "<<outFileName<<endl; 
+  // TString outFileName = "TransformMatrices.root";
+  // TFile outFile(outFileName, "update");
+  // outFile.cd();
+  // hTransform->Write(0,TObject::kOverwrite);
+  // cout<<"Transform matrix "<<hTransform->GetName()
+  //     <<" written to "<<outFileName<<endl; 
 }
 
 
