@@ -22,23 +22,25 @@ class ParticleCoor;
 //This fixes it.
 #define _CXX_VER_ "g++(4.9.1)" 
 
-Bool_t debug = kFALSE;
+Bool_t debug = kTRUE;
 
 void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2PDG)
 {
   // Main function.  Specify how many input files to use and this
   // will generate a list of file names to use and pass them on.
-
+  TStopwatch myTime;
   // Load in the necessary therminator particle class
   gInterpreter->AddIncludePath("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/include");
   gROOT->LoadMacro("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/src/ParticleCoor.cxx");
 
-
+  Bool_t isIdentical = kFALSE;
+  if(parent1PDG == parent2PDG) isIdentical = kTRUE;
   vector<TString> fileNames = GetTFileNames(nFiles);
   gInterpreter->GenerateDictionary("vector<vector<Int_t> >","vector");
   vector< vector<Int_t> > parent1IDs;
   vector< vector<Int_t> > parent2IDs;
   vector< vector<Int_t> > lambdaIDs;
+
 
 
   // Loop over each file and gather the track IDs
@@ -94,37 +96,48 @@ void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2
   }
 
   
-  // // Loop over the files and use the track IDs to calculate kstar and
-  // // fill the transform matrix.  We use event mixing for more
-  // // statistics.
-  // TH2D *hTransform = SetupMatrixHist(parent1PDG, parent2PDG);
-  // for (Int_t iFile1 = 0; iFile1 < nFiles; iFile1++)
-  // {
-  //   // Read in the file and get the particle branch
-  //   TFile inFile1(fileNames[iFile1], "read");
-  //   assert(NULL != &inFile1);
-  //   TTree *thermTree1 = (TTree*) inFile1.Get("particles");
-  //   assert(NULL != thermTree1);
+  // Loop over the files and use the track IDs to calculate kstar and
+  // fill the transform matrix.  We use event mixing for more
+  // statistics.
+  cout<<"Preparing to fill transform matrix"<<endl;
+  TH2D *hTransform = SetupMatrixHist(parent1PDG, parent2PDG);
+  for (Int_t iFile1 = 0; iFile1 < nFiles; iFile1++)
+  {
+    // Read in the file and get the particle branch
+    if(debug) cout<<"File1: \t"<<iFile1<<endl;
+    TFile inFile1(fileNames[iFile1], "read");
+    assert(NULL != &inFile1);
+    TTree *thermTree1 = (TTree*) inFile1.Get("particles");
+    assert(NULL != thermTree1);
 
-  //   for (Int_t iFile2 = iFile1; iFile2 < nFiles; iFile2++)
-  //   {
-  //     TFile inFile2(fileNames[iFile2], "read");
-  //     assert(NULL != &inFile2);
-  //     TTree *thermTree2 = (TTree*) inFile2.Get("particles");
-  //     assert(NULL != thermTree2);
+    Int_t file2Start = 0;
+    if(isIdentical) file2Start = iFile1;
+    for (Int_t iFile2 = file2Start; iFile2 < nFiles; iFile2++)
+    {
+      if(debug) cout<<"\t\tFile2: \t"<<iFile2<<endl;
+
+      TFile inFile2(fileNames[iFile2], "read");
+      assert(NULL != &inFile2);
+      TTree *thermTree2;
+      if(iFile2 == iFile1) thermTree2 = thermTree1;
+      else thermTree2 = (TTree*) inFile2.Get("particles");
+      assert(NULL != thermTree2);
       
-  //     FillTransformMatrix(hTransform, parent1IDs, parent2IDs, lambdaIDs, iFile1, iFile2, thermTree1, thermTree2);
-  //   }
-  // }
+      FillTransformMatrix(hTransform, parent1IDs, parent2IDs, lambdaIDs, iFile1, iFile2, thermTree1, thermTree2, isIdentical);
+    }
+  }
 
 
   
-  // TString outFileName = "TransformMatrices.root";
-  // TFile outFile(outFileName, "update");
-  // outFile.cd();
-  // hTransform->Write(0,TObject::kOverwrite);
-  // cout<<"Transform matrix "<<hTransform->GetName()
-  //     <<" written to "<<outFileName<<endl; 
+  TString outFileName = "TransformMatrices.root";
+  TFile outFile(outFileName, "update");
+  outFile.cd();
+  hTransform->Write(0,TObject::kOverwrite);
+  cout<<"Transform matrix "<<hTransform->GetName()
+      <<" written to "<<outFileName<<endl; 
+  cout<<"Real Time:\t"<<myTime.RealTime()<<endl
+      <<"CPU Time: \t"<<myTime.CpuTime()<<endl;
+  
 }
 
 
@@ -488,63 +501,67 @@ Int_t GetElectroWeakPDG(Int_t index)
 }
 
 
-void FillTransformMatrix(TH2D *hTransform, vector<Int_t> &parent1IDs, vector<Int_t> &parent2IDs, vector<Int_t> &lambdaIDs, TTree *thermTree)
+void FillTransformMatrix(TH2D *hTransform, vector<vector<Int_t> > &parent1IDs, vector<vector<Int_t> > &parent2IDs, vector<vector<Int_t> > &lambdaIDs, Int_t iFile1, Int_t iFile2, TTree *thermTree1, TTree *thermTree2, Bool_t isIdentical)
 {
   if(debug) cout<<"Filling transform matrix\n";
-
+  
   // Prepare to get particles from the TBranch
   ParticleCoor *parent1 = new ParticleCoor;
   ParticleCoor *parent2 = new ParticleCoor;
   ParticleCoor *daughter1 = new ParticleCoor;
   ParticleCoor *daughter2 = new ParticleCoor;
 
-  TBranch *thermBranch = thermTree->GetBranch("particle");
+  TBranch *thermBranch1 = thermTree1->GetBranch("particle");
+  TBranch *thermBranch2 = thermTree2->GetBranch("particle");
     // thermBranch->SetAddress(particleEntry);
   
   // Loop over both sets of parents and make pairs
-  for(Int_t iPart1 = 0; iPart1 < parent1IDs.size(); iPart1++)
+  for(Int_t iPart1 = 0; iPart1 < parent1IDs[iFile1].size(); iPart1++)
   {
     // Get the parent particle
-    Int_t parID1 = parent1IDs[iPart1];
+    Int_t parID1 = parent1IDs[iFile1][iPart1];
     if(parID1 == -555) continue; 
-    thermBranch->SetAddress(parent1);
-    assert(thermTree->GetEntry(parID1) > 0);
+    thermBranch1->SetAddress(parent1);
+    assert(thermTree1->GetEntry(parID1) > 0);
 
     // Get the daughter particle
-    Int_t dauID1 = lambdaIDs[iPart1];
-    thermBranch->SetAddress(daughter1);
-    assert(thermTree->GetEntry(dauID1) > 0);
+    Int_t dauID1 = lambdaIDs[iFile1][iPart1];
+    thermBranch1->SetAddress(daughter1);
+    assert(thermTree1->GetEntry(dauID1) > 0);
     
-
-    for(Int_t iPart2 = 0; iPart2 < parent2IDs.size(); iPart2++)
+    if(debug) cout<<"Particle1:\t"<<iPart1<<endl;
+  
+    Int_t part2StartValue = 0;
+    if(isIdentical && (iFile1 == iFile2)) part2StartValue = iPart1 + 1;
+    for(Int_t iPart2 = part2StartValue; iPart2 < parent2IDs[iFile2].size(); iPart2++)
     {
       //Check to make sure we arent using the same parent particle
-      if(iPart1 == iPart2) continue;
+      // if((iFile1 == iFile2) && (iPart1 == iPart2)) continue;
 
       // Get the parent particle
-      Int_t parID2 = parent2IDs[iPart2];
+      Int_t parID2 = parent2IDs[iFile2][iPart2];
       if(parID2 == -555) continue; 
-      thermBranch->SetAddress(parent2);
-      assert(thermTree->GetEntry(parID2) > 0);
+      thermBranch2->SetAddress(parent2);
+      assert(thermTree2->GetEntry(parID2) > 0);
 
       // Get the daughter particle
-      Int_t dauID2 = lambdaIDs[iPart2];
-      thermBranch->SetAddress(daughter2);
-      assert(thermTree->GetEntry(dauID2) > 0);
+      Int_t dauID2 = lambdaIDs[iFile2][iPart2];
+      thermBranch2->SetAddress(daughter2);
+      assert(thermTree2->GetEntry(dauID2) > 0);
 
       // We should not have the same daughter or parent IDs
-      assert(dauID1 != dauID2);
-      assert(parID1 != parID2);
+      if(iFile1 == iFile2) {
+	assert(dauID1 != dauID2);
+	assert(parID1 != parID2);
+      }
       
       // Calculate kstar and fill the histogram
       Double_t kstarParents = CalcKstar(parent1, parent2);
       Double_t kstarDaughters = CalcKstar(daughter1, daughter2);
       hTransform->Fill(kstarDaughters, kstarParents);
-    }
-
-  }
-  
-}
+    } // end particle 2 loop
+  } // end particle 1 loop
+}  
 
 Double_t CalcKstar(ParticleCoor *part1, ParticleCoor *part2)
 {
