@@ -24,18 +24,22 @@ class ParticleCoor;
 
 Bool_t debug = kTRUE;
 
-void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2PDG)
+void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2PDG, Bool_t isLocal)
 {
   // Main function.  Specify how many input files to use and this
   // will generate a list of file names to use and pass them on.
   TStopwatch myTime;
   // Load in the necessary therminator particle class
-  gInterpreter->AddIncludePath("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/include");
-  gROOT->LoadMacro("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/src/ParticleCoor.cxx");
-
+  if(isLocal) {
+    gInterpreter->AddIncludePath("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/include");
+    gROOT->LoadMacro("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/src/ParticleCoor.cxx");
+  }
+  else {
+      gROOT->LoadMacro("./ParticleCoor.cxx");
+  }
   Bool_t isIdentical = kFALSE;
   if(parent1PDG == parent2PDG) isIdentical = kTRUE;
-  vector<TString> fileNames = GetTFileNames(nFiles);
+  vector<TString> fileNames = GetTFileNames(nFiles, isLocal);
   gInterpreter->GenerateDictionary("vector<vector<Int_t> >","vector");
   vector< vector<Int_t> > parent1IDs;
   vector< vector<Int_t> > parent2IDs;
@@ -104,7 +108,7 @@ void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2
   for (Int_t iFile1 = 0; iFile1 < nFiles; iFile1++)
   {
     // Read in the file and get the particle branch
-    if(debug) cout<<"File1: \t"<<iFile1<<endl;
+    cout<<"File1: \t"<<iFile1<<endl;
     TFile inFile1(fileNames[iFile1], "read");
     assert(NULL != &inFile1);
     TTree *thermTree1 = (TTree*) inFile1.Get("particles");
@@ -114,7 +118,7 @@ void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2
     if(isIdentical) file2Start = iFile1;
     for (Int_t iFile2 = file2Start; iFile2 < nFiles; iFile2++)
     {
-      if(debug) cout<<"\t\tFile2: \t"<<iFile2<<endl;
+      cout<<"\t\tFile2: \t"<<iFile2<<endl;
 
       TFile inFile2(fileNames[iFile2], "read");
       assert(NULL != &inFile2);
@@ -197,14 +201,16 @@ TString GetNameFromPDG(Int_t pdgCode, Bool_t isHistTitle)
   return pdgName;
 }
 
-vector<TString> GetTFileNames(const Int_t nFiles)
+vector<TString> GetTFileNames(const Int_t nFiles, Bool_t isLocal)
 {
   // Use the number of files to generate a list of event file names
   cout<<"Getting the TFile names of "<<nFiles<<" files\n";
   vector<TString> fileNames;
   
   for(Int_t i = 0; i < nFiles; i++){
-    TString name = "~/Analysis/lambda/AliAnalysisLambda/therminator2/events/lhyquid3v-LHCPbPb2760b2.3Ti512t0.60Tf140a0.08b0.08h0.24x2.3v2/event";
+    TString name;
+    if(isLocal) name += "~/Analysis/lambda/AliAnalysisLambda/therminator2/events/lhyquid3v-LHCPbPb2760b2.3Ti512t0.60Tf140a0.08b0.08h0.24x2.3v2/event";
+    else name += "/home/jsalzwedel/Model/lhyqid3v_LHCPbPb_2760_b2/event";
     if(i < 10) name += "00";
     else if(i < 100) name += "0";
     name += i;
