@@ -22,13 +22,13 @@ class ParticleCoor;
 //This fixes it.
 #define _CXX_VER_ "g++(4.9.1)" 
 
-Bool_t debug = kTRUE;
+Bool_t debug = kFALSE;
 
 void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2PDG, Bool_t isLocal)
 {
   // Main function.  Specify how many input files to use and this
   // will generate a list of file names to use and pass them on.
-  TStopwatch myTime;
+  TStopwatch fullTimer;
   // Load in the necessary therminator particle class
   if(isLocal) {
     gInterpreter->AddIncludePath("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/include");
@@ -46,7 +46,7 @@ void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2
   vector< vector<Int_t> > lambdaIDs;
 
 
-
+  TStopwatch inputTimer;
   // Loop over each file and gather the track IDs
   for (Int_t iFile = 0; iFile < nFiles; iFile++)
   {
@@ -99,7 +99,7 @@ void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2
     assert(lambdaIDs.size() == iFile+1);
   }
 
-  
+  cout<<"Real time elapsed during file reading:\t"<<inputTimer.RealTime()<<endl;
   // Loop over the files and use the track IDs to calculate kstar and
   // fill the transform matrix.  We use event mixing for more
   // statistics.
@@ -108,6 +108,7 @@ void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2
   for (Int_t iFile1 = 0; iFile1 < nFiles; iFile1++)
   {
     // Read in the file and get the particle branch
+    TStopwatch fileTimer;
     cout<<"File1: \t"<<iFile1<<endl;
     TFile inFile1(fileNames[iFile1], "read");
     assert(NULL != &inFile1);
@@ -118,7 +119,8 @@ void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2
     if(isIdentical) file2Start = iFile1;
     for (Int_t iFile2 = file2Start; iFile2 < nFiles; iFile2++)
     {
-      cout<<"\t\tFile2: \t"<<iFile2<<endl;
+      TStopwatch smallLoopTimer;
+      cout<<"\t\tFile2: \t"<<iFile2; // Stay on the same line for the stopwatch
 
       TFile inFile2(fileNames[iFile2], "read");
       assert(NULL != &inFile2);
@@ -128,13 +130,15 @@ void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2
       assert(NULL != thermTree2);
       
       FillTransformMatrix(hTransform, parent1IDs, parent2IDs, lambdaIDs, iFile1, iFile2, thermTree1, thermTree2, isIdentical);
+      cout<<"\tSmall loop real time\t"<<smallLoopTimer.RealTime()<<endl;
     }
     
     // Save a work-in-progress copy of the histogram
     TFile tempOutFile("WIPTransform.root","Update");
     hTransform->Write(hTransform->GetName(),TObject::kOverwrite);
     tempOutFile.Close();
-
+    cout<<"File loop real Time:\t"<<fileTimer.RealTime()<<endl
+	<<"File loop CPU Time: \t"<<fileTimer.CpuTime()<<endl;
   }
 
 
@@ -145,8 +149,8 @@ void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2
   hTransform->Write(0,TObject::kOverwrite);
   cout<<"Transform matrix "<<hTransform->GetName()
       <<" written to "<<outFileName<<endl; 
-  cout<<"Real Time:\t"<<myTime.RealTime()<<endl
-      <<"CPU Time: \t"<<myTime.CpuTime()<<endl;
+  cout<<"Total real Time:\t"<<fullTimer.RealTime()<<endl
+      <<"Total CPU Time: \t"<<fullTimer.CpuTime()<<endl;
   
 }
 
