@@ -129,6 +129,12 @@ void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2
       
       FillTransformMatrix(hTransform, parent1IDs, parent2IDs, lambdaIDs, iFile1, iFile2, thermTree1, thermTree2, isIdentical);
     }
+    
+    // Save a work-in-progress copy of the histogram
+    TFile tempOutFile("WIPTransform.root","Update");
+    hTransform->Write(hTransform->GetName(),TObject::kOverwrite);
+    tempOutFile.Close();
+
   }
 
 
