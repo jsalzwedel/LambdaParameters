@@ -202,10 +202,12 @@ TString GetNameFromPDG(Int_t pdgCode, Bool_t isHistTitle)
   if((pdgCode < 0) && isHistTitle) pdgName += "Anti";
   else if(pdgCode < 0) pdgName += "bar{#";
   if(fabs(pdgCode) == kLam) pdgName += "Lambda";
-  else if(fabs(pdgCode) == kSigma) pdgName += "Sigma";
-  else if(fabs(pdgCode) == kXiC) pdgName += "Xi^{-}";
-  else if(fabs(pdgCode) == kXi0) pdgName += "Xi^{0}";
-  else if(fabs(pdgCode) == kOmega) pdgName += "Omega";
+  if(fabs(pdgCode) == kSigma) pdgName += "Sigma";
+  if((fabs(pdgCode) == kXiC) && isHistTitle) pdgName += "XiC";
+  else if(fabs(pdgCode) == kXiC)  pdgName += "Xi^{-}";
+  if((fabs(pdgCode) == kXi0)  && isHistTitle) pdgName += "Xi0";
+  else if(fabs(pdgCode) == kXi0)  pdgName += "Xi^{0}";
+  if(fabs(pdgCode) == kOmega) pdgName += "Omega";
 
   if((pdgCode < 0) && !isHistTitle) pdgName += "}";
   return pdgName;
