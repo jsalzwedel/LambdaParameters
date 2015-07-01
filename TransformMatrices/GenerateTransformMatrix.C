@@ -743,7 +743,6 @@ void CheckForDuplicateTracks(Int_t nFiles, Bool_t isLocal)
 	    <<"\tNumber of dupes:\t"<<hashes[d.key]<<endl;
       }
     }
-    cout<<"End of file\n";
   }
   cout<<"End of analysis\n";
 }
