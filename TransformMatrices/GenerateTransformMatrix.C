@@ -8,6 +8,7 @@
 //********************************************************************
 
 #include <vector>
+#include <map>
 
 enum ParticlePDG {kProt   = 2212,  kAntiProt = -2212, 
 		  kPiPlus = 211,   kPiMinus  = -211, 
@@ -602,4 +603,147 @@ Double_t CalcKstar(ParticleCoor *part1, ParticleCoor *part2)
   Double_t kstar = fabs(lvKstar.M());
   // cout<<"kstar is:\t"<<kstar<<endl;
   return kstar;
+}
+
+
+TH2D* BasicCharacterLoadTransform(TString fileName = "TransformMatricesSigSig32.root",
+				  TString histName = "TransformMatrixSigmaSigma")
+{
+  // function for plotting nice transform matrices
+
+  //Read in the file
+  // cout<<"Input root file name"<<endl;
+  // TString fileName = "TransformMatricesSigSig32.root";
+  // cin>>fileName;
+  cout<<"Reading from "<<fileName<<endl;
+  TFile inFile(fileName);
+
+  //Read in the histogram
+  // cout<<"Input 2D hist name"<<endl;
+  // TString histName = "TransformMatrixSigmaSigma";
+  // cin>>histName;
+  cout<<"Loading histogram "<<histName<<endl;
+  TH2D *h = (TH2D*) inFile.Get(histName);
+  h->SetDirectory(0);
+  return h;
+}
+
+TH2D* SpecialCharacterLoadTransform(TString fileName = "WIPTransform.root",
+				  TString histName = "TransformMatrixXi^{0}Lambda")
+{
+  TFile file(fileName);
+  TList *list = (TList *)file.GetListOfKeys();
+  TKey *key = (TKey *)list->FindObject(histName);
+  TObject *obj = ((TKey *)key)->ReadObj();
+  TH2D *h = (TH2D*)obj;
+  h->SetDirectory(0);
+  return h;
+}
+
+void PlotTransformMatrix(TH2D *h, TString histName, Int_t rebinN)
+{
+  //Given a transform matrix, plot it
+
+  //Make it pretty and draw it.
+  gStyle->SetPalette(55);
+  TCanvas *cTransform = new TCanvas("transform",histName,650,650);
+  cTransform->SetLogz();
+  
+  cout<<"Found histogram at "<<h<<endl;
+  cout<<"Changing axis range"<<endl;
+  h->SetAxisRange(0.,0.5,"X");
+  h->SetAxisRange(0.,0.5,"Y");
+  h->DrawCopy("colz");
+
+  TCanvas *cTransformRebin = new TCanvas("transformRebin",histName,650,650);
+  cTransformRebin->SetLogz();
+  cout<<"Rebinning by "<<rebinN<<endl;
+  
+  // cin>>rebinN;
+
+  h->RebinX(rebinN);
+  h->RebinY(rebinN);
+  h->SetAxisRange(0.,0.5,"X");
+  h->SetAxisRange(0.,0.5,"Y");
+  h->DrawCopy("colz");
+}
+
+void RunTransformPlotting(TString loadType = "special",
+			  TString histName = "TransformMatrixXi^{0}Lambda",
+			  TString fileName = "WIPTransform.root",
+			  Int_t rebinN = 4)
+{
+  TH2D *h;
+
+  if(loadType == "special") h = SpecialCharacterLoadTransform(fileName,histName);
+  else if(loadType == "basic") h = BasicCharacterLoadTransform(fileName,histName);
+  else {cout<<"Not a valid loadType"<<endl; return;}
+  
+  if(!h) {cout<<"Could not find histogram"<<endl; return;};
+  PlotTransformMatrix(h, histName, rebinN);
+
+}
+
+
+
+
+void CheckForDuplicateTracks(Int_t nFiles, Bool_t isLocal)
+{
+  // Worried that there might be duplicate tracks/events in the
+  // Therminator events.  Use a hash table to see if any track
+  // appears more than once.
+
+  if(isLocal) {
+    gInterpreter->AddIncludePath("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/include");
+    gROOT->LoadMacro("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/src/ParticleCoor.cxx");
+  }
+  else {
+    gROOT->LoadMacro("./ParticleCoor.cxx");
+  }
+  vector<TString> fileNames = GetTFileNames(nFiles, isLocal);
+
+  union Digest
+  {
+    UChar_t foo[16];
+    ULong64_t key;
+  };
+
+  std::map<ULong64_t, int> hashes;
+  Digest d;
+
+  
+  for (Int_t iFile = 0; iFile < nFiles; iFile++)
+  {
+    // Read in the file and get the particle branch
+    TFile inFile(fileNames[iFile], "read");
+    assert(NULL != &inFile);
+    TTree *thermTree = (TTree*) inFile.Get("particles");
+    assert(NULL != thermTree);
+
+    cout<<"Now using file "<<iFile<<endl;
+    
+    Int_t nThermEntries = thermTree->GetEntries();
+    // Get the particle branch
+    ParticleCoor *particleEntry = new ParticleCoor();
+    TBranch *thermBranch = thermTree->GetBranch("particle");
+    thermBranch->SetAddress(particleEntry);
+
+    for(Int_t iPart = 0; iPart < nThermEntries; iPart++)
+    {
+      // Get a particle entry
+      int nBytesInEntry = thermTree->GetEntry(iPart);
+      assert(nBytesInEntry > 0);
+
+      TMD5 hash;
+      hash.Update((UChar_t *)particleEntry,sizeof(ParticleCoor));
+      hash.Final(d.foo);
+      hashes[d.key]++;
+      if(hashes[d.key] > 1) {
+	cout<<"Duplicate Key:\t"<<d.key<<endl
+	    <<"\tNumber of dupes:\t"<<hashes[d.key]<<endl;
+      }
+    }
+    cout<<"End of file\n";
+  }
+  cout<<"End of analysis\n";
 }
