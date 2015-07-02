@@ -25,6 +25,7 @@ class ParticleCoor;
 
 Bool_t debug = kFALSE;
 
+
 void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2PDG, Bool_t isLocal)
 {
   // Main function.  Specify how many input files to use and this
@@ -710,7 +711,10 @@ void CheckForDuplicateTracks(Int_t nFiles, Bool_t isLocal)
 
   std::map<ULong64_t, int> hashes;
   Digest d;
-
+  Int_t nTotalDupes = 0;
+  Int_t nTotalParticles = 0;
+  vector<Int_t> problemFiles;
+  Int_t mostDupes = 0;
   
   for (Int_t iFile = 0; iFile < nFiles; iFile++)
   {
@@ -728,6 +732,9 @@ void CheckForDuplicateTracks(Int_t nFiles, Bool_t isLocal)
     TBranch *thermBranch = thermTree->GetBranch("particle");
     thermBranch->SetAddress(particleEntry);
 
+
+    Int_t fileDupes = 0;
+    Int_t fileOkays = 0;
     for(Int_t iPart = 0; iPart < nThermEntries; iPart++)
     {
       // Get a particle entry
@@ -739,10 +746,37 @@ void CheckForDuplicateTracks(Int_t nFiles, Bool_t isLocal)
       hash.Final(d.foo);
       hashes[d.key]++;
       if(hashes[d.key] > 1) {
-	cout<<"Duplicate Key:\t"<<d.key<<endl
-	    <<"\tNumber of dupes:\t"<<hashes[d.key]<<endl;
+	//cout<<"File:\t"<<iFile<<"\t"
+	//    <<"Particle:\t"<<iPart<<"\t"
+	//    <<"Duplicate Key:\t"<<d.key<<"\t"
+	//    <<"\tNumber of dupes:\t"<<hashes[d.key]<<endl;
+	nTotalDupes++;
+	fileDupes++;
+
+	// Find the max number of problem dupes
+	if(hashes[d.key] > mostDupes) mostDupes = hashes[d.key];
+	
+	// Count the number of problem files problem file
+	if( (problemFiles.size() > 0) && (problemFiles.final != iFile) ) {
+	  problemFiles.push_back(iFile);
+	  cout<<"New problem file:\t"<<iFile<<endl;
+	}
       }
+      else {
+	fileOkays++;
+      }
+      nTotalParticles++;
     }
+    cout<<"Dupes in this file:\t"<<fileDupes<<endl;
+    cout<<"Okays in this file:\t"<<fileOkays<<endl;
   }
-  cout<<"End of analysis\n";
+  cout<<"End of analysis.\n"
+      <<"Total files:\t"<<nFiles<<"\n"
+      <<"Total particles:\t"<<nTotalParticles<<"\n"
+      <<"Total duplicates:\t"<<nTotalDupes<<"\n"
+      <<"Most duplicates of one track:\t"<<mostDupes<<"\n";
+  cout<<"\nProblem files:\n";
+  for(Int_t iFile = 0; iFile < problemFiles.size(); iFile++){
+    cout<<problemFiles[iFile]<<endl;
+  }
 }
