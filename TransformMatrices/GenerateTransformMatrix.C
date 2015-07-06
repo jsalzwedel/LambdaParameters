@@ -758,7 +758,7 @@ void CheckForDuplicateTracks(Int_t nFiles, Bool_t isLocal)
 	if(hashes[d.key] > mostDupes) mostDupes = hashes[d.key];
 	
 	// Count the number of problem files problem file
-	if( (problemFiles.size() > 0) && (problemFiles.final() != iFile) ) {
+	if( (problemFiles.size() > 0) && (problemFiles.back() != iFile) ) {
 	  problemFiles.push_back(iFile);
 	  cout<<"New problem file:\t"<<iFile<<endl;
 	}
