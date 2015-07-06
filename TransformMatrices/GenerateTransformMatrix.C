@@ -701,7 +701,8 @@ void CheckForDuplicateTracks(Int_t nFiles, Bool_t isLocal)
   else {
     gROOT->LoadMacro("./ParticleCoor.cxx");
   }
-  vector<TString> fileNames = GetTFileNames(nFiles, isLocal);
+  //vector<TString> fileNames = GetTFileNames(nFiles, isLocal);
+  vector<TString> fileNames = GetDebugTFileNames(nFiles, isLocal);
 
   union Digest
   {
@@ -724,7 +725,7 @@ void CheckForDuplicateTracks(Int_t nFiles, Bool_t isLocal)
     TTree *thermTree = (TTree*) inFile.Get("particles");
     assert(NULL != thermTree);
 
-    cout<<"Now using file "<<iFile<<endl;
+    cout<<"Now using file "<<fileNames[iFile]<<endl;
     
     Int_t nThermEntries = thermTree->GetEntries();
     // Get the particle branch
@@ -757,7 +758,7 @@ void CheckForDuplicateTracks(Int_t nFiles, Bool_t isLocal)
 	if(hashes[d.key] > mostDupes) mostDupes = hashes[d.key];
 	
 	// Count the number of problem files problem file
-	if( (problemFiles.size() > 0) && (problemFiles.final != iFile) ) {
+	if( (problemFiles.size() > 0) && (problemFiles.final() != iFile) ) {
 	  problemFiles.push_back(iFile);
 	  cout<<"New problem file:\t"<<iFile<<endl;
 	}
@@ -779,4 +780,37 @@ void CheckForDuplicateTracks(Int_t nFiles, Bool_t isLocal)
   for(Int_t iFile = 0; iFile < problemFiles.size(); iFile++){
     cout<<problemFiles[iFile]<<endl;
   }
+}
+
+
+vector<TString> GetDebugTFileNames(const Int_t nFiles, Bool_t isLocal)
+{
+  // Use the number of files to generate a list of event file names
+  cout<<"Getting the TFile names of "<<nFiles<<" files\n";
+  vector<TString> fileNames;
+
+  TString nameBase;
+  if(isLocal) nameBase += "~/Analysis/lambda/AliAnalysisLambda/therminator2/events/lhyquid3v-LHCPbPb2760b2.3Ti512t0.60Tf140a0.08b0.08h0.24x2.3v2/event";
+  else nameBase += "/home/jsalzwedel/Model/lhyqid3v_LHCPbPb_2760_b2/event";
+
+
+  //Weird stuff starts happening with the 28th file.  Let's put that and 29 near the beginning of the lineup.
+  fileNames.push_back(nameBase + "028.root");
+  fileNames.push_back(nameBase + "001.root");
+  fileNames.push_back(nameBase + "029.root");
+
+  
+  for(Int_t i = 2; i < nFiles+3; i++){
+    if((i == 28) || (i == 29)) continue;
+    TString name;
+    if(isLocal) name += "~/Analysis/lambda/AliAnalysisLambda/therminator2/events/lhyquid3v-LHCPbPb2760b2.3Ti512t0.60Tf140a0.08b0.08h0.24x2.3v2/event";
+    else name += "/home/jsalzwedel/Model/lhyqid3v_LHCPbPb_2760_b2/event";
+    if(i < 10) name += "00";
+    else if(i < 100) name += "0";
+    name += i;
+    name += ".root";
+    fileNames.push_back(name);
+  }
+
+  return fileNames;
 }
