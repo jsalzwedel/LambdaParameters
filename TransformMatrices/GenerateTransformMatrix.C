@@ -796,8 +796,9 @@ vector<TString> GetDebugTFileNames(const Int_t nFiles, Bool_t isLocal)
 
   //Weird stuff starts happening with the 28th file.  Let's put that and 29 near the beginning of the lineup.
   fileNames.push_back(nameBase + "028.root");
-  fileNames.push_back(nameBase + "001.root");
+  fileNames.push_back(nameBase + "012.root");
   fileNames.push_back(nameBase + "029.root");
+  fileNames.push_back(nameBase + "013.root");
 
   
   for(Int_t i = 2; i < nFiles+3; i++){
