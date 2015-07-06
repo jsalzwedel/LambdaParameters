@@ -13,7 +13,7 @@ class ParticleCoor;
 #define _CXX_VER_ "g++(4.9.1)" 
 
 
-void CheckForDuplicateTracks(Int_t nFiles, Bool_t isLocal)
+void CheckForDuplicateTracks(Int_t nFiles)
 {
   // Worried that there might be duplicate tracks/events in the
   // Therminator events.  Use a hash table to see if any track
@@ -21,24 +21,29 @@ void CheckForDuplicateTracks(Int_t nFiles, Bool_t isLocal)
   // previously appeared in any event/file (including the current 
   // event/file).
 
-  if(isLocal) {
-    gInterpreter->AddIncludePath("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/include");
-    gROOT->LoadMacro("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/src/ParticleCoor.cxx");
-  }
-  else {
-    gROOT->LoadMacro("./ParticleCoor.cxx");
-  }
-  // vector<TString> fileNames = GetTFileNames(nFiles, isLocal);
-  vector<TString> fileNames = GetDebugTFileNames(nFiles, isLocal);
 
+  // Load in the ParticleCoor class (change this to the correct
+  // directory)
+  gROOT->LoadMacro("./ParticleCoor.cxx");
+
+
+  // Set useDebugNames to false to look at a generic list of files.
+  // Set useDebugNames to true if you want to compare a few specific files.
+  Bool_t useDebugNames = kFALSE;
+  vector<TString> fileNames = GetTFileNames(nFiles, usDebugNames);
+
+  // We'll use this Digest union when we make a hash of ParticleCoor objects
   union Digest
   {
     UChar_t foo[16];
     ULong64_t key;
   };
 
+  // Make a hash table
   std::map<ULong64_t, int> hashes;
   Digest d;
+
+  // Some simple counting variables
   Int_t nTotalDupes = 0;
   Int_t nTotalParticles = 0;
   vector<Int_t> problemFiles;
@@ -69,6 +74,7 @@ void CheckForDuplicateTracks(Int_t nFiles, Bool_t isLocal)
       int nBytesInEntry = thermTree->GetEntry(iPart);
       assert(nBytesInEntry > 0);
 
+      // Make a hash of this ParticleCoor and add it to the hash table
       TMD5 hash;
       hash.Update((UChar_t *)particleEntry,sizeof(ParticleCoor));
       hash.Final(d.foo);
@@ -109,55 +115,29 @@ void CheckForDuplicateTracks(Int_t nFiles, Bool_t isLocal)
   }
 }
 
-
-
-vector<TString> GetTFileNames(const Int_t nFiles, Bool_t isLocal)
-{
-  // Use the number of files to generate a list of event file names
-  cout<<"Getting the TFile names of "<<nFiles<<" files\n";
-  vector<TString> fileNames;
-  
-  for(Int_t i = 0; i < nFiles; i++){
-    TString name;
-    if(isLocal) name += "~/Analysis/lambda/AliAnalysisLambda/therminator2/events/lhyquid3v-LHCPbPb2760b2.3Ti512t0.60Tf140a0.08b0.08h0.24x2.3v2/event";
-    else name += "/home/jsalzwedel/Model/lhyqid3v_LHCPbPb_2760_b2/event";
-    if(i < 10) name += "00";
-    else if(i < 100) name += "0";
-    name += i;
-    name += ".root";
-    fileNames.push_back(name);
-  }
-
-  return fileNames;
-}
-
-
-
-vector<TString> GetDebugTFileNames(const Int_t nFiles, Bool_t isLocal)
+vector<TString> GetTFileNames(const Int_t nFiles, Bool_t useDebugFiles)
 {
   // Use the number of files to generate a list of event file names
   // 
   cout<<"Getting the TFile names of "<<nFiles<<" files\n";
   vector<TString> fileNames;
 
-  TString nameBase;
-  if(isLocal) nameBase += "~/Analysis/lambda/AliAnalysisLambda/therminator2/events/lhyquid3v-LHCPbPb2760b2.3Ti512t0.60Tf140a0.08b0.08h0.24x2.3v2/event";
-  else nameBase += "/home/jsalzwedel/Model/lhyqid3v_LHCPbPb_2760_b2/event";
+  // TString nameBase = "/home/jsalzwedel/Model/lhyquid3v-LHCPbPb2760b2.3Ti512t0.60Tf140a0.08b0.08h0.24x2.3v2/event";
+  TString nameBase = "/home/jsalzwedel/Model/lhyqid3v_LHCPbPb_2760_b2/event";
 
 
-  // It looks like file 28 and 12 contain some duplicate particles.
-  // Likewise with 29 and 13.  Let's look at them specifically.
-  fileNames.push_back(nameBase + "028.root");
-  fileNames.push_back(nameBase + "012.root");
-  fileNames.push_back(nameBase + "029.root");
-  fileNames.push_back(nameBase + "013.root");
-
+  if(useDebugFiles)
+  {
+    // It looks like files 28 and 12 contain some duplicate particles.
+    // Let's look at them specifically.
+    // Likewise with 29 and 13 seem to have a similar problem.
+    fileNames.push_back(nameBase + "028.root");
+    fileNames.push_back(nameBase + "012.root");
+  }
   
   for(Int_t i = 0; i < nFiles+3; i++){
-    if((i == 28) || (i == 29)) continue;
-    TString name;
-    if(isLocal) name += "~/Analysis/lambda/AliAnalysisLambda/therminator2/events/lhyquid3v-LHCPbPb2760b2.3Ti512t0.60Tf140a0.08b0.08h0.24x2.3v2/event";
-    else name += "/home/jsalzwedel/Model/lhyqid3v_LHCPbPb_2760_b2/event";
+    if((i == 28) || (i == 12)) continue;
+    TString name = nameBase;
     if(i < 10) name += "00";
     else if(i < 100) name += "0";
     name += i;
