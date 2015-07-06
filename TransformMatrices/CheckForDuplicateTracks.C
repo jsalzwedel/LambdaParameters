@@ -27,10 +27,10 @@ void CheckForDuplicateTracks(Int_t nFiles)
   gROOT->LoadMacro("./ParticleCoor.cxx");
 
 
-  // Set useDebugNames to false to look at a generic list of files.
-  // Set useDebugNames to true if you want to compare a few specific files.
-  Bool_t useDebugNames = kFALSE;
-  vector<TString> fileNames = GetTFileNames(nFiles, usDebugNames);
+  // Set useDebugFileList to false to look at a generic list of files.
+  // Set useDebugFileList to true if you want to compare a few specific files.
+  Bool_t useDebugFileList = kFALSE;
+  vector<TString> fileNames = GetTFileNames(nFiles, useDebugFileList);
 
   // We'll use this Digest union when we make a hash of ParticleCoor objects
   union Digest
@@ -108,14 +108,14 @@ void CheckForDuplicateTracks(Int_t nFiles)
       <<"Total files:\t"<<nFiles<<"\n"
       <<"Total particles:\t"<<nTotalParticles<<"\n"
       <<"Total duplicates:\t"<<nTotalDupes<<"\n"
-      <<"Most duplicates of one track:\t"<<mostDupes<<"\n";
+      <<"Most duplicate copies of one track:\t"<<mostDupes<<"\n";
   cout<<"\nProblem files:\n";
   for(Int_t iFile = 0; iFile < problemFiles.size(); iFile++){
     cout<<problemFiles[iFile]<<endl;
   }
 }
 
-vector<TString> GetTFileNames(const Int_t nFiles, Bool_t useDebugFiles)
+vector<TString> GetTFileNames(const Int_t nFiles, Bool_t useDebugFileList)
 {
   // Use the number of files to generate a list of event file names
   // 
@@ -126,7 +126,7 @@ vector<TString> GetTFileNames(const Int_t nFiles, Bool_t useDebugFiles)
   TString nameBase = "/home/jsalzwedel/Model/lhyqid3v_LHCPbPb_2760_b2/event";
 
 
-  if(useDebugFiles)
+  if(useDebugFileList)
   {
     // It looks like files 28 and 12 contain some duplicate particles.
     // Let's look at them specifically.
