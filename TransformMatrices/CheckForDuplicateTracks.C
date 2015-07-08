@@ -139,7 +139,7 @@ vector<TString> GetTFileNames(const Int_t nFiles, Bool_t useDebugFileList)
     if((i == 28) || (i == 12)) continue;
     TString name = nameBase;
     char nameTemp[1024];
-    sprintf(name, "%s%03d.root", nameBase, i);
+    sprintf(nameTemp, "%s%03d.root", nameBase.Data(), i);
     TString name(nameTemp);
     fileNames.push_back(name);
   }
