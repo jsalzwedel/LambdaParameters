@@ -123,8 +123,9 @@ vector<TString> GetTFileNames(const Int_t nFiles, Bool_t useDebugFileList)
   vector<TString> fileNames;
 
   // TString nameBase = "/home/jsalzwedel/Model/lhyquid3v-LHCPbPb2760b2.3Ti512t0.60Tf140a0.08b0.08h0.24x2.3v2/event";
-  //TString nameBase = "/home/jsalzwedel/Model/lhyqid3v_LHCPbPb_2760_b2/event";
-  TString nameBase = "/home/jsalzwedel/therminator/therminator2Old/events/lhyquid3v-LHCPbPb2760b2.3Ti512t0.60Tf140a0.08b0.08h0.24x2.3v2/event";
+  // TString nameBase = "/home/jsalzwedel/Model/lhyqid3v_LHCPbPb_2760_b2/event";
+  // TString nameBase = "/home/jsalzwedel/therminator/therminator2Old/events/lhyquid3v-LHCPbPb2760b2.3Ti512t0.60Tf140a0.08b0.08h0.24x2.3v2/event";
+  TString nameBase = "/home/jsalzwedel/therminator/therminator2Fixed/events/lhyquid3v-LHCPbPb2760b2.3Ti512t0.60Tf140a0.08b0.08h0.24x2.3v2/event";
 
   if(useDebugFileList)
   {
