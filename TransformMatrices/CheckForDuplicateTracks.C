@@ -13,7 +13,7 @@ class ParticleCoor;
 #define _CXX_VER_ "g++(4.9.1)" 
 
 
-void CheckForDuplicateTracks(Int_t nFiles)
+void CheckForDuplicateTracks(Int_t nFiles, bool useDebugFileList = kFALSE)
 {
   // Worried that there might be duplicate tracks/events in the
   // Therminator events.  Use a hash table to see if any track
@@ -29,7 +29,7 @@ void CheckForDuplicateTracks(Int_t nFiles)
 
   // Set useDebugFileList to false to look at a generic list of files.
   // Set useDebugFileList to true if you want to compare a few specific files.
-  Bool_t useDebugFileList = kFALSE;
+  // Bool_t useDebugFileList = kFALSE;
   vector<TString> fileNames = GetTFileNames(nFiles, useDebugFileList);
 
   // We'll use this Digest union when we make a hash of ParticleCoor objects
@@ -123,8 +123,8 @@ vector<TString> GetTFileNames(const Int_t nFiles, Bool_t useDebugFileList)
   vector<TString> fileNames;
 
   // TString nameBase = "/home/jsalzwedel/Model/lhyquid3v-LHCPbPb2760b2.3Ti512t0.60Tf140a0.08b0.08h0.24x2.3v2/event";
-  TString nameBase = "/home/jsalzwedel/Model/lhyqid3v_LHCPbPb_2760_b2/event";
-
+  //TString nameBase = "/home/jsalzwedel/Model/lhyqid3v_LHCPbPb_2760_b2/event";
+  TString nameBase = "/home/jsalzwedel/therminator/therminator2Old/events/lhyquid3v-LHCPbPb2760b2.3Ti512t0.60Tf140a0.08b0.08h0.24x2.3v2/event";
 
   if(useDebugFileList)
   {
@@ -135,13 +135,12 @@ vector<TString> GetTFileNames(const Int_t nFiles, Bool_t useDebugFileList)
     fileNames.push_back(nameBase + "012.root");
   }
   
-  for(Int_t i = 0; i < nFiles+3; i++){
+  for(Int_t i = 0; i < nFiles; i++){
     if((i == 28) || (i == 12)) continue;
     TString name = nameBase;
-    if(i < 10) name += "00";
-    else if(i < 100) name += "0";
-    name += i;
-    name += ".root";
+    char nameTemp[1024];
+    sprintf(name, "%s%03d.root", nameBase, i);
+    TString name(nameTemp);
     fileNames.push_back(name);
   }
 
