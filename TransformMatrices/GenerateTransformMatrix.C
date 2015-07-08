@@ -48,18 +48,15 @@ void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2
   vector< vector<Int_t> > lambdaIDs;
 
 
-  TStopwatch inputTimer;
   // Loop over each file and gather the track IDs
   for (Int_t iFile = 0; iFile < nFiles; iFile++)
   {
-    
     // Read in the file and get the particle branch
+    cout<<"Now reading in file "<<iFile<<" located at "<<fileNames[iFile]<<endl;
     TFile inFile(fileNames[iFile], "read");
     assert(NULL != &inFile);
     TTree *thermTree = (TTree*) inFile.Get("particles");
     assert(NULL != thermTree);
-
-    cout<<"Now using file "<<iFile<<endl;
 
     Int_t nThermEntries = thermTree->GetEntries();
     Int_t nextEntry = 0;
@@ -101,7 +98,9 @@ void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2
     assert(lambdaIDs.size() == iFile+1);
   }
 
-  cout<<"Real time elapsed during file reading:\t"<<inputTimer.RealTime()<<endl;
+  cout<<"File Reading complete.  Total time elapsed:\t";
+  fullTimer.Print();
+  fullTimer.Continue();
   // Loop over the files and use the track IDs to calculate kstar and
   // fill the transform matrix.  We use event mixing for more
   // statistics.
@@ -132,15 +131,23 @@ void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2
       assert(NULL != thermTree2);
       
       FillTransformMatrix(hTransform, parent1IDs, parent2IDs, lambdaIDs, iFile1, iFile2, thermTree1, thermTree2, isIdentical);
-      cout<<"\tSmall loop real time\t"<<smallLoopTimer.RealTime()<<endl;
+      cout<<"\tSub loop time elapsed\t";
+      smallLoopTimer.Print();
+      cout<<"Total time elapsed:\t";
+      fullTimer.Print();
+      fullTimer.Continue();
     }
     
     // Save a work-in-progress copy of the histogram
     TFile tempOutFile("WIPTransform.root","Update");
     hTransform->Write(hTransform->GetName(),TObject::kOverwrite);
     tempOutFile.Close();
-    cout<<"File loop real Time:\t"<<fileTimer.RealTime()<<endl
-	<<"File loop CPU Time: \t"<<fileTimer.CpuTime()<<endl;
+    cout<<"Main loop time elapsed\t";
+    fileTimer.Print()<<endl;
+    cout<<"Total time elapsed:\t";
+    fullTimer.Print();
+    fullTimer.Continue();
+
   }
 
 
@@ -150,10 +157,10 @@ void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2
   outFile.cd();
   hTransform->Write(0,TObject::kOverwrite);
   cout<<"Transform matrix "<<hTransform->GetName()
-      <<" written to "<<outFileName<<endl; 
-  cout<<"Total real Time:\t"<<fullTimer.RealTime()<<endl
-      <<"Total CPU Time: \t"<<fullTimer.CpuTime()<<endl;
-  
+      <<" written to "<<outFileName<<endl;
+  cout<<"Total time elapsed:\t";
+  fullTimer.Print();
+  fullTimer.Continue();
 }
 
 
@@ -220,15 +227,16 @@ vector<TString> GetTFileNames(const Int_t nFiles, Bool_t isLocal)
   // Use the number of files to generate a list of event file names
   cout<<"Getting the TFile names of "<<nFiles<<" files\n";
   vector<TString> fileNames;
-  
+
+  TString nameBase;
+  if(isLocal) nameBase += "~/Analysis/lambda/AliAnalysisLambda/therminator2/events/lhyquid3v-LHCPbPb2760b2.3Ti512t0.60Tf140a0.08b0.08h0.24x2.3v2/event";
+  else nameBase += "/home/jsalzwedel/therminator/therminator2Fixed/events/lhyquid3v-LHCPbPb2760b2.3Ti512t0.60Tf140a0.08b0.08h0.24x2.3v2/event";
+
   for(Int_t i = 0; i < nFiles; i++){
-    TString name;
-    if(isLocal) name += "~/Analysis/lambda/AliAnalysisLambda/therminator2/events/lhyquid3v-LHCPbPb2760b2.3Ti512t0.60Tf140a0.08b0.08h0.24x2.3v2/event";
-    else name += "/home/jsalzwedel/Model/lhyqid3v_LHCPbPb_2760_b2/event";
-    if(i < 10) name += "00";
-    else if(i < 100) name += "0";
-    name += i;
-    name += ".root";
+    TString name = nameBase;
+    char nameTemp[1024];
+    sprintf(nameTemp, "%s%03d.root", nameBase.Data(), i);
+    TString name(nameTemp);
     fileNames.push_back(name);
   }
 
@@ -249,12 +257,6 @@ vector<Int_t> GetIDsOfLambdas(const Int_t parent1PDG, const Int_t parent2PDG, co
    ParticleCoor *particleEntry = new ParticleCoor();
    TBranch *thermBranch = thermTree->GetBranch("particle");
    thermBranch->SetAddress(particleEntry);
-   // cout<<"Test1"<<endl;
-   // thermTree->GetEntry(1);
-   // cout<<particleEntry<<"\t"<<particleEntry->eid<<endl;
-   // thermTree->GetEntry(2);
-   // cout<<particleEntry<<"\t"<<particleEntry->eid<<endl;
-   // cout<<"Test2"<<endl;
 
    //Get first particle in this event
    const Int_t startingEntry = nextEntry;
@@ -683,135 +685,4 @@ void RunTransformPlotting(TString loadType = "special",
   if(!h) {cout<<"Could not find histogram"<<endl; return;};
   PlotTransformMatrix(h, histName, rebinN);
 
-}
-
-
-
-
-void CheckForDuplicateTracks(Int_t nFiles, Bool_t isLocal)
-{
-  // Worried that there might be duplicate tracks/events in the
-  // Therminator events.  Use a hash table to see if any track
-  // appears more than once.
-
-  if(isLocal) {
-    gInterpreter->AddIncludePath("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/include");
-    gROOT->LoadMacro("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/src/ParticleCoor.cxx");
-  }
-  else {
-    gROOT->LoadMacro("./ParticleCoor.cxx");
-  }
-  //vector<TString> fileNames = GetTFileNames(nFiles, isLocal);
-  vector<TString> fileNames = GetDebugTFileNames(nFiles, isLocal);
-
-  union Digest
-  {
-    UChar_t foo[16];
-    ULong64_t key;
-  };
-
-  std::map<ULong64_t, int> hashes;
-  Digest d;
-  Int_t nTotalDupes = 0;
-  Int_t nTotalParticles = 0;
-  vector<Int_t> problemFiles;
-  Int_t mostDupes = 0;
-  
-  for (Int_t iFile = 0; iFile < nFiles; iFile++)
-  {
-    // Read in the file and get the particle branch
-    TFile inFile(fileNames[iFile], "read");
-    assert(NULL != &inFile);
-    TTree *thermTree = (TTree*) inFile.Get("particles");
-    assert(NULL != thermTree);
-
-    cout<<"Now using file "<<fileNames[iFile]<<endl;
-    
-    Int_t nThermEntries = thermTree->GetEntries();
-    // Get the particle branch
-    ParticleCoor *particleEntry = new ParticleCoor();
-    TBranch *thermBranch = thermTree->GetBranch("particle");
-    thermBranch->SetAddress(particleEntry);
-
-
-    Int_t fileDupes = 0;
-    Int_t fileOkays = 0;
-    for(Int_t iPart = 0; iPart < nThermEntries; iPart++)
-    {
-      // Get a particle entry
-      int nBytesInEntry = thermTree->GetEntry(iPart);
-      assert(nBytesInEntry > 0);
-
-      TMD5 hash;
-      hash.Update((UChar_t *)particleEntry,sizeof(ParticleCoor));
-      hash.Final(d.foo);
-      hashes[d.key]++;
-      if(hashes[d.key] > 1) {
-	//cout<<"File:\t"<<iFile<<"\t"
-	//    <<"Particle:\t"<<iPart<<"\t"
-	//    <<"Duplicate Key:\t"<<d.key<<"\t"
-	//    <<"\tNumber of dupes:\t"<<hashes[d.key]<<endl;
-	nTotalDupes++;
-	fileDupes++;
-
-	// Find the max number of problem dupes
-	if(hashes[d.key] > mostDupes) mostDupes = hashes[d.key];
-	
-	// Count the number of problem files problem file
-	if( (problemFiles.size() > 0) && (problemFiles.back() != iFile) ) {
-	  problemFiles.push_back(iFile);
-	  cout<<"New problem file:\t"<<iFile<<endl;
-	}
-      }
-      else {
-	fileOkays++;
-      }
-      nTotalParticles++;
-    }
-    cout<<"Dupes in this file:\t"<<fileDupes<<endl;
-    cout<<"Okays in this file:\t"<<fileOkays<<endl;
-  }
-  cout<<"End of analysis.\n"
-      <<"Total files:\t"<<nFiles<<"\n"
-      <<"Total particles:\t"<<nTotalParticles<<"\n"
-      <<"Total duplicates:\t"<<nTotalDupes<<"\n"
-      <<"Most duplicates of one track:\t"<<mostDupes<<"\n";
-  cout<<"\nProblem files:\n";
-  for(Int_t iFile = 0; iFile < problemFiles.size(); iFile++){
-    cout<<problemFiles[iFile]<<endl;
-  }
-}
-
-
-vector<TString> GetDebugTFileNames(const Int_t nFiles, Bool_t isLocal)
-{
-  // Use the number of files to generate a list of event file names
-  cout<<"Getting the TFile names of "<<nFiles<<" files\n";
-  vector<TString> fileNames;
-
-  TString nameBase;
-  if(isLocal) nameBase += "~/Analysis/lambda/AliAnalysisLambda/therminator2/events/lhyquid3v-LHCPbPb2760b2.3Ti512t0.60Tf140a0.08b0.08h0.24x2.3v2/event";
-  else nameBase += "/home/jsalzwedel/Model/lhyqid3v_LHCPbPb_2760_b2/event";
-
-
-  //Weird stuff starts happening with the 28th file.  Let's put that and 29 near the beginning of the lineup.
-  fileNames.push_back(nameBase + "028.root");
-  fileNames.push_back(nameBase + "012.root");
-  fileNames.push_back(nameBase + "029.root");
-  fileNames.push_back(nameBase + "013.root");
-
-  
-  for(Int_t i = 2; i < nFiles+3; i++){
-    if((i == 28) || (i == 29)) continue;
-    TString name;
-    if(isLocal) name += "~/Analysis/lambda/AliAnalysisLambda/therminator2/events/lhyquid3v-LHCPbPb2760b2.3Ti512t0.60Tf140a0.08b0.08h0.24x2.3v2/event";
-    else name += "/home/jsalzwedel/Model/lhyqid3v_LHCPbPb_2760_b2/event";
-    if(i < 10) name += "00";
-    else if(i < 100) name += "0";
-    name += i;
-    name += ".root";
-    fileNames.push_back(name);
-  }
-
-  return fileNames;
 }
