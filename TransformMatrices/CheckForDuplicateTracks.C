@@ -52,12 +52,13 @@ void CheckForDuplicateTracks(Int_t nFiles, bool useDebugFileList = kFALSE)
   for (Int_t iFile = 0; iFile < nFiles; iFile++)
   {
     // Read in the file and get the particle branch
+    cout<<"Now reading in file "<<iFile<<" located at "<<fileNames[iFile]<<endl;
     TFile inFile(fileNames[iFile], "read");
     assert(NULL != &inFile);
     TTree *thermTree = (TTree*) inFile.Get("particles");
     assert(NULL != thermTree);
 
-    cout<<"Now using file "<<fileNames[iFile]<<endl;
+    
     
     Int_t nThermEntries = thermTree->GetEntries();
     // Get the particle branch
@@ -136,7 +137,7 @@ vector<TString> GetTFileNames(const Int_t nFiles, Bool_t useDebugFileList)
   }
   
   for(Int_t i = 0; i < nFiles; i++){
-    if((i == 28) || (i == 12)) continue;
+    if(useDebugFileList && ((i == 28) || (i == 12))) continue;
     TString name = nameBase;
     char nameTemp[1024];
     sprintf(nameTemp, "%s%03d.root", nameBase.Data(), i);
