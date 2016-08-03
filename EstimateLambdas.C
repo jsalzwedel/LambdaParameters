@@ -34,7 +34,7 @@ enum Particle {kProt = 2212, kAntiProt = -2212,
 	       kLam = 3122, kALam = -3122};
 enum PairType {kLamLam=0, kALamALam=1, kLamALam=2};
 
-void EstimateLambdas(const PairType pairType, int nFiles=2)
+void EstimateLambdas(const PairType pairType, int nFiles=2, Bool_t useEfficiency)
 {
   // Main function. Generates list of file names
   // and pass them to RunSimpleLambdaEstimate
@@ -42,7 +42,7 @@ void EstimateLambdas(const PairType pairType, int nFiles=2)
     cout<<"Bad input pair type\n";
     return;
   }
-  TString filePath = "/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/events/lhyquid3v-LHCPbPb2760b2.3Ti512t0.60Tf140a0.08b0.08h0.24x2.3v2/";
+  TString filePath = "~/therminator/therminator2Fixed/events/lhyquid3v-LHCPbPb2760b2.3Ti512t0.60Tf140a0.08b0.08h0.24x2.3v2/";
   vector<TString> inputFileNames;
 
   cout<<"\nAnalyzing the following files:\n";
@@ -59,17 +59,17 @@ void EstimateLambdas(const PairType pairType, int nFiles=2)
   }
 
   // Load in the necessary therminator particle class
-  gInterpreter->AddIncludePath("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/include");
-  gROOT->LoadMacro("/home/jai/Analysis/lambda/AliAnalysisLambda/therminator2/build/src/ParticleCoor.cxx");
+  gInterpreter->AddIncludePath("~/therminator/therminator2Fixed/build/include");
+  gROOT->LoadMacro("~/therminator/therminator2Fixed/build/src/ParticleCoor.cxx");
   
   // // Finally, before we run, set the seed for the random
   // // number generator that handles efficiency generation
   // gRandom->SetSeed(1);
-  RunSimpleLambdaEstimate(inputFileNames, pairType);
+  RunSimpleLambdaEstimate(inputFileNames, pairType, useEfficiency);
 }
 
 
-void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<TString> inputFileNames, const PairType pairType)
+void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<TString> inputFileNames, const PairType pairType, Bool_t useEfficiency)
 {
   // Outputs and saves histograms of 
   // lambda parameters and average particle multiplicities
@@ -85,7 +85,7 @@ void RunSimpleLambdaEstimate(/*TString inputFileName = "event000.root"*/ vector<
   }
   int nParticleTypes = 6; // 5 real hyperons + 1 fake
 
-  GenerateYieldHistograms(nParticleTypes, inputFileNames, eventParticles1, eventParticles2, pairType);
+  GenerateYieldHistograms(nParticleTypes, inputFileNames, eventParticles1, eventParticles2, pairType, useEfficiency);
 
   //Make, draw, and save a histo of average particle yields
   TH1D *hAvgYields = NULL;
@@ -269,7 +269,7 @@ void UseDaughtersToFindParents(const TTree *thermTree, Int_t &nextEntry, const I
 }
 
 
-void GenerateYieldHistograms(const int nParticleTypes, vector<TString> &inputFileNames, vector<TH1D*> &eventParticles1, vector<TH1D*> &eventParticles2, const PairType pairType)
+void GenerateYieldHistograms(const int nParticleTypes, vector<TString> &inputFileNames, vector<TH1D*> &eventParticles1, vector<TH1D*> &eventParticles2, const PairType pairType, Bool_t useEfficiency)
 {
   
   cout<<"Starting particle collection"<<endl;
@@ -308,13 +308,13 @@ void GenerateYieldHistograms(const int nParticleTypes, vector<TString> &inputFil
       
       //Only push back histogram vectors if we find V0s.
       if(!(lambdaIDs.size() == 0)) {
-	TH1D *lambdaYields = FillLambdaYieldHist(thermTree,lambdaIDs,eventCounter,kLam, nParticleTypes);
+	TH1D *lambdaYields = FillLambdaYieldHist(thermTree,lambdaIDs,eventCounter,kLam, nParticleTypes, useEfficiency);
 	if(lambdaYields && lambdaYields->GetEntries() > 0) {
 	  eventParticles1.push_back(lambdaYields);
 	}
       }
       if(!(antiLambdaIDs.size() == 0)) {
-	TH1D *antiLambdaYields = FillLambdaYieldHist(thermTree,antiLambdaIDs,eventCounter,kALam,nParticleTypes);
+	TH1D *antiLambdaYields = FillLambdaYieldHist(thermTree,antiLambdaIDs,eventCounter,kALam,nParticleTypes, useEfficiency);
 	if(antiLambdaYields && antiLambdaYields->GetEntries() > 0) {
 	  if(pairType == kLamALam) {
 	    eventParticles2.push_back(antiLambdaYields);
@@ -330,7 +330,7 @@ void GenerateYieldHistograms(const int nParticleTypes, vector<TString> &inputFil
   cout<<"Total events used:\t"<<eventCounter<<endl;
 }
 
-TH1D *FillLambdaYieldHist(const TTree *thermTree, const vector<Int_t> &v0IDs, const int eventCounter, const Particle part, const int nParticleTypes)
+TH1D *FillLambdaYieldHist(const TTree *thermTree, const vector<Int_t> &v0IDs, const int eventCounter, const Particle part, const int nParticleTypes, Bool_t useEfficiency)
 {
   cout<<"Filling yield histogram for event "<<eventCounter<<endl;
   int strangePDGs[5] = {3122, //Lambda
@@ -371,7 +371,7 @@ TH1D *FillLambdaYieldHist(const TTree *thermTree, const vector<Int_t> &v0IDs, co
     assert(pid == part);
 
     //Make sure the particle passes reconstruction cuts
-    if(!CheckIfPassLambdaCuts(particleEntry)) continue;
+    if(!CheckIfPassLambdaCuts(particleEntry, useEfficiency)) continue;
     
     //Bin the particle according to its parent info
     bool isResonance = true;
@@ -739,7 +739,7 @@ bool CheckIfPassDaughterCuts(const ParticleCoor *particle, const int pid)
   return true;
 }
 
-bool CheckIfPassLambdaCuts(const ParticleCoor *particle)
+bool CheckIfPassLambdaCuts(const ParticleCoor *particle, Bool_t useEfficiency)
 {
   //Implement all sorts of reconstruction/detection cuts here
   double etaCut = 0.8;
@@ -750,10 +750,10 @@ bool CheckIfPassLambdaCuts(const ParticleCoor *particle)
   // return true;
 
   //Finally, let's simulate efficiency
-  return SimulateV0Efficiency();
+  return SimulateV0Efficiency(useEfficiency);
 }
 
-bool SimulateV0Efficiency(/*const double pT*/)
+bool SimulateV0Efficiency(Bool_t useEfficiency/*, const double pT*/)
 {
   // Simulate the efficiency of reconstructing V0 efficiency.
   //This could be pT dependent. But for now, just roll the
@@ -763,9 +763,11 @@ bool SimulateV0Efficiency(/*const double pT*/)
   //branching ratio, which is already accounted for by only
   //taking proton+pion daughters. So, factoring 64% out of 
   //15% gives us 23%.
-  double efficiency = 0.23;
-  if(gRandom->Rndm() < efficiency) return true;
-  else return false;
+  if (useEfficiency) {
+    double efficiency = 0.23;
+    if(gRandom->Rndm() < efficiency) return true;
+    else return false;
+  } else return true;
 }
 
 
