@@ -668,8 +668,7 @@ double ComputeLambdaNonIdenticalError(const int part1, const int part2, const ve
 TH1D *ComputeAverageYields(const vector<TH1D*> &eventParticles, const Particle part)
 {
   //Find the average yields and std deviation for each particle type
-  //Current error bars show the error of the avg calculation, not the
-  //std deviation of the yields
+  //Error bars show the standard error of the mean
   cout<<"Generating average yield histogram"<<endl;
   int nEvents = eventParticles.size();
   TString histName = "AvgYields";
@@ -703,7 +702,8 @@ TH1D *ComputeAverageYields(const vector<TH1D*> &eventParticles, const Particle p
   for(int iBin = 1; iBin <= hVariance->GetNbinsX(); iBin++){
     double rootVal = hVariance->GetBinContent(iBin);
     rootVal = sqrt(rootVal);
-    hAvgYields->SetBinError(iBin,rootVal);
+    double stdErrOfMean = rootVal / sqrt(nEvents);
+    hAvgYields->SetBinError(iBin, stdErrorOfMean);
   }
   
   cout<<"Finished generating average yield histogram"<<endl;
@@ -753,7 +753,7 @@ bool CheckIfPassLambdaCuts(const ParticleCoor *particle, Bool_t useEfficiency)
   return SimulateV0Efficiency(useEfficiency);
 }
 
-bool SimulateV0Efficiency(Bool_t useEfficiency/*, const double pT*/)
+bool SimulateV0Efficiency(Bool_t useEfficiency)
 {
   // Simulate the efficiency of reconstructing V0 efficiency.
   //This could be pT dependent. But for now, just roll the
