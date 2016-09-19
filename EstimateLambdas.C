@@ -425,8 +425,9 @@ void InjectFakes(const vector<TH1D*> &eventParticles, TH1D *hAvgYields, int nPar
   {
     double avgFakeYield = totalFakes/(1. * nEvents);
     double stdDeviation = sqrt(estimatedAvgFakes);
+    double stdErrorOfMean = stdDeviation/sqrt(nEvents);
     hAvgYields->SetBinContent(nParticleTypes, avgFakeYield);
-    hAvgYields->SetBinError(nParticleTypes, stdDeviation);
+    hAvgYields->SetBinError(nParticleTypes, stdErrorOfMean);
   }
 }
 
@@ -703,7 +704,7 @@ TH1D *ComputeAverageYields(const vector<TH1D*> &eventParticles, const Particle p
     double rootVal = hVariance->GetBinContent(iBin);
     rootVal = sqrt(rootVal);
     double stdErrOfMean = rootVal / sqrt(nEvents);
-    hAvgYields->SetBinError(iBin, stdErrorOfMean);
+    hAvgYields->SetBinError(iBin, stdErrOfMean);
   }
   
   cout<<"Finished generating average yield histogram"<<endl;

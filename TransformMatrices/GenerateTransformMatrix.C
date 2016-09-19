@@ -110,7 +110,7 @@ void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2
   {
     // Read in the file and get the particle branch
     TStopwatch fileTimer;
-    cout<<"File1: \t"<<iFile1<<endl;
+    cout<<"FileA: \t"<<iFile1<<endl;
     TFile inFile1(fileNames[iFile1], "read");
     assert(NULL != &inFile1);
     TTree *thermTree1 = (TTree*) inFile1.Get("particles");
@@ -121,7 +121,7 @@ void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2
     for (Int_t iFile2 = file2Start; iFile2 < nFiles; iFile2++)
     {
       TStopwatch smallLoopTimer;
-      cout<<"\t\tFile2: \t"<<iFile2; // Stay on the same line for the stopwatch
+      cout<<"\t\tFileB: \t"<<iFile2; // Stay on the same line for the stopwatch
 
       TFile inFile2(fileNames[iFile2], "read");
       assert(NULL != &inFile2);
@@ -133,7 +133,7 @@ void GenerateTransformMatrix(const Int_t nFiles, Int_t parent1PDG, Int_t parent2
       FillTransformMatrix(hTransform, parent1IDs, parent2IDs, lambdaIDs, iFile1, iFile2, thermTree1, thermTree2, isIdentical);
       cout<<"\tSub loop time elapsed\t";
       smallLoopTimer.Print();
-      cout<<"Total time elapsed:\t";
+      cout<<"\t\t\t\tTotal time elapsed:\t";
       fullTimer.Print();
       fullTimer.Continue();
     }
